@@ -72,7 +72,8 @@ export const AdminDashboard: React.FC = () => {
   const totalOtHours = otAlerts.reduce((s, a) => s + a.otHours, 0);
   const totalHours = techs.reduce((s, t) => s + getTotalHours(t.id), 0);
 
-  const colors = ['#36a2eb', '#ff6384', '#4bc0c0', '#ff9f40', '#9966ff', '#ffcd56', '#c9cbcf', '#22c55e'];
+  // SQS brand-aligned chart colors
+  const colors = ['#f27c22', '#d17609', '#935f10', '#6c5f14', '#36d399', '#3abff8', '#a78bfa', '#fb923c'];
 
   function renderChart() {
     if (!chartRef.current) return;
@@ -109,8 +110,10 @@ export const AdminDashboard: React.FC = () => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'bottom', labels: { color: '#a6adba', usePointStyle: true, padding: 15 } },
+          legend: { position: 'bottom', labels: { color: '#e0d6cc', usePointStyle: true, padding: 15, font: { family: 'Montserrat' } } },
           tooltip: {
+            titleFont: { family: 'Montserrat' },
+            bodyFont: { family: 'Montserrat' },
             callbacks: {
               afterLabel: (ctx: any) => {
                 const hrs = ctx.parsed.y;
@@ -124,18 +127,18 @@ export const AdminDashboard: React.FC = () => {
             min: 0,
             max: maxHrs,
             ticks: {
-              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= 40 ? '#ef4444' : '#a6adba',
+              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= 40 ? '#ef4444' : '#e0d6cc',
               callback: (v: number | string) => Number(v) === 40 ? '40h ⛔' : `${v}h`,
-              font: (ctx: any) => ({ size: 10, weight: (ctx.tick?.value != null && ctx.tick.value === 40 ? 'bold' : 'normal') as any }),
+              font: (ctx: any) => ({ size: 10, family: 'Montserrat', weight: (ctx.tick?.value != null && ctx.tick.value === 40 ? 'bold' : 'normal') as any }),
             },
             grid: {
-              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 40 ? '#ef4444' : '#2a2e37',
+              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 40 ? '#ef4444' : '#1a1f26',
               lineWidth: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 40 ? 2 : 1,
             },
           },
           x: {
-            ticks: { color: '#a6adba' },
-            grid: { color: '#2a2e37' },
+            ticks: { color: '#e0d6cc', font: { family: 'Montserrat' } },
+            grid: { color: '#1a1f26' },
           },
         },
       },
@@ -181,19 +184,19 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="stat bg-base-200 rounded-lg p-3">
+        <div className="stat bg-base-200 rounded-lg p-3 border border-primary/10">
           <div className="stat-title text-xs"><Users size={14} className="inline mr-1" />Technicians</div>
           <div className="stat-value text-xl">{techs.length}</div>
         </div>
-        <div className="stat bg-base-200 rounded-lg p-3">
+        <div className="stat bg-base-200 rounded-lg p-3 border border-primary/10">
           <div className="stat-title text-xs"><Clock size={14} className="inline mr-1" />Total Hours</div>
           <div className="stat-value text-xl">{totalHours.toFixed(1)}</div>
         </div>
-        <div className="stat bg-base-200 rounded-lg p-3">
+        <div className="stat bg-base-200 rounded-lg p-3 border border-primary/10">
           <div className="stat-title text-xs">Time Entries</div>
           <div className="stat-value text-xl">{entries.length}</div>
         </div>
-        <div className={`stat rounded-lg p-3 ${totalOtHours > 0 ? 'bg-error/20 border border-error/30' : 'bg-base-200'}`}>
+        <div className={`stat rounded-lg p-3 ${totalOtHours > 0 ? 'bg-error/20 border border-error/30' : 'bg-base-200 border border-primary/10'}`}>
           <div className="stat-title text-xs"><TrendingUp size={14} className="inline mr-1" />OT Hours</div>
           <div className={`stat-value text-xl ${totalOtHours > 0 ? 'text-error' : ''}`}>
             {totalOtHours.toFixed(1)}
@@ -202,7 +205,7 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Chart */}
-      <div className="card bg-base-200">
+      <div className="card bg-base-200 border border-primary/10">
         <div className="card-body p-4">
           <h3 className="font-semibold text-sm mb-2">Weekly Hours — {monthNames[month]} {year}</h3>
           <div style={{ height: '320px' }}>
@@ -245,7 +248,7 @@ export const AdminDashboard: React.FC = () => {
           const weeklyHrs = getWeeklyHours(t.id);
           const hasOt = weeklyHrs.some(h => h > 40);
           return (
-            <div key={t.id} className={`card ${hasOt ? 'bg-error/10 border-2 border-error/40' : 'bg-base-200'}`}>
+            <div key={t.id} className={`card ${hasOt ? 'bg-error/10 border-2 border-error/40' : 'bg-base-200 border border-primary/10'}`}>
               <div className="card-body p-4">
                 <div className="flex justify-between items-start">
                   <div>

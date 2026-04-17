@@ -30,7 +30,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
   return (
     <div className="w-56 bg-base-200 flex flex-col h-full border-r border-base-300">
       <div className="p-4 border-b border-base-300">
-        <h2 className="font-bold text-sm text-primary tracking-wide">⚡ Field Service</h2>
+        <div className="flex items-center gap-2 mb-2">
+          <img src="/sqs-logo.svg" alt="SQS" className="h-8 w-8" />
+          <div>
+            <h2 className="font-bold text-xs text-primary tracking-wide leading-tight">SEQUOIA QUALITY</h2>
+            <h2 className="font-bold text-xs text-primary tracking-wide leading-tight">SOLUTIONS</h2>
+          </div>
+        </div>
         <p className="text-xs text-base-content/50 mt-1 truncate">{profile.name}</p>
         <span className="badge badge-xs badge-primary mt-1">{profile.role.toUpperCase()}</span>
       </div>

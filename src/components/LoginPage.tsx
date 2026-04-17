@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogIn, Clock, MapPin, BarChart3 } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface LoginPageProps {
@@ -30,16 +30,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-base-300 p-4">
-      <div className="card bg-base-100 w-full max-w-md shadow-2xl">
+      {/* Diagonal stripe background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-5">
+        <div className="absolute -top-1/2 -right-1/4 w-full h-[200%] rotate-[25deg]"
+          style={{ background: 'linear-gradient(180deg, #6c5f14 0%, #935f10 30%, #d17609 60%, #f27c22 100%)' }}
+        />
+      </div>
+
+      <div className="card bg-base-100 w-full max-w-md shadow-2xl border border-primary/20 relative z-10">
         <div className="card-body">
-          <div className="text-center mb-4">
-            <div className="flex justify-center gap-2 mb-3 text-primary">
-              <Clock size={28} />
-              <MapPin size={28} />
-              <BarChart3 size={28} />
-            </div>
-            <h1 className="text-2xl font-bold">Field Service Tracker</h1>
-            <p className="text-sm text-base-content/60 mt-1">Sign in to continue</p>
+          <div className="text-center mb-6">
+            <img src="/sqs-logo.svg" alt="Sequoia Quality Solutions" className="h-20 w-20 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold tracking-wide" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+              SEQUOIA QUALITY SOLUTIONS
+            </h1>
+            <p className="text-sm text-primary font-medium mt-1">Field Service Tracker</p>
+            <p className="text-xs text-base-content/40 mt-2">Sign in to continue</p>
           </div>
 
           {error && (
@@ -50,10 +56,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="form-control">
-              <label className="label"><span className="label-text">Email</span></label>
+              <label className="label"><span className="label-text font-medium">Email</span></label>
               <input
                 type="email"
-                className="input input-bordered w-full"
+                className="input input-bordered w-full focus:border-primary"
                 placeholder="you@company.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -61,10 +67,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               />
             </div>
             <div className="form-control">
-              <label className="label"><span className="label-text">Password</span></label>
+              <label className="label"><span className="label-text font-medium">Password</span></label>
               <input
                 type="password"
-                className="input input-bordered w-full"
+                className="input input-bordered w-full focus:border-primary"
                 placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
@@ -73,13 +79,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </div>
             <button
               type="submit"
-              className={`btn btn-primary w-full ${loading ? 'loading' : ''}`}
+              className={`btn btn-primary w-full font-semibold text-base ${loading ? 'loading' : ''}`}
               disabled={loading}
             >
               <LogIn size={18} />
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
+
+          <p className="text-center text-xs text-base-content/30 mt-4">
+            © {new Date().getFullYear()} Sequoia Quality Solutions
+          </p>
         </div>
       </div>
     </div>
