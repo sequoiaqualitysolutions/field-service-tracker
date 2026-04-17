@@ -1,0 +1,52 @@
+export interface Profile {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'tech';
+  hourly_rate: number;
+  created_at?: string;
+}
+
+export interface Client {
+  id: number;
+  account_number: string;
+  name: string;
+  address: string;
+  contact_name: string;
+  contact_phone: string;
+  service_type: string;
+  notes: string;
+  created_at?: string;
+  client_assignments?: { tech_id: string; profiles: { id: string; name: string } }[];
+}
+
+export interface ClientAssignment {
+  id: number;
+  client_id: number;
+  tech_id: string;
+}
+
+export interface TimeEntry {
+  id: number;
+  tech_id: string;
+  client_id: number;
+  start_time: string;
+  end_time: string | null;
+  start_lat: number | null;
+  start_lng: number | null;
+  stop_lat: number | null;
+  stop_lng: number | null;
+  notes: string;
+  created_at?: string;
+  clients?: { name: string; account_number: string };
+  profiles?: { name: string };
+}
+
+export type AppView = 'dashboard' | 'clients' | 'pay-report' | 'tech-portal' | 'user-management';
+
+export interface WeekInfo {
+  week: number;
+  startDay: number;
+  endDay: number;
+  label: string;
+}
