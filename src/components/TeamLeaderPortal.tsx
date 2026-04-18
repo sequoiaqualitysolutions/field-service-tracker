@@ -275,6 +275,47 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
     setLoading(false);
   }
 
+  async function handleClockOutSingleTech(entryId: number) {
+    if (!activeSession) return;
+    setLoading(true);
+    setGpsStatus('Acquiring stop GPS...');
+
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    try {
+      const coords = await getCurrentGps();
+      lat = coords.lat;
+      lng = coords.lng;
+      setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+    } catch {
+      setGpsStatus('Stop GPS unavailable');
+    }
+
+    const now = new Date().toISOString();
+
+    // Calculate distance from session start
+    let distance: number | null = null;
+    if (activeSession.start_lat != null && activeSession.start_lng != null && lat != null && lng != null) {
+      distance = calcDistanceKm(activeSession.start_lat, activeSession.start_lng, lat, lng);
+    }
+
+    const { error } = await supabase.from('time_entries').update({
+      end_time: now,
+      stop_lat: lat,
+      stop_lng: lng,
+      distance_km: distance,
+    }).eq('id', entryId);
+
+    if (error) {
+      console.error('Individual clock-out error:', error);
+      setGpsStatus('Failed to clock out: ' + error.message);
+    }
+
+    await loadData();
+    setLoading(false);
+  }
+
   async function handleAddTech(techId: string) {
     if (!activeSession) return;
     // Check if tech is already clocked in
@@ -489,9 +530,21 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
                           {isLeader ? '👑' : '🔧'} {(entry.profiles as any)?.name || 'Unknown'}
                           {isLeader && <span className="badge badge-xs badge-primary">You</span>}
                         </span>
-                        <span className="badge badge-sm badge-ghost font-mono">
-                          {formatDuration(entryHours)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="badge badge-sm badge-ghost font-mono">
+                            {formatDuration(entryHours)}
+                          </span>
+                          {!isLeader && (
+                            <button
+                              className="btn btn-xs btn-error btn-outline"
+                              onClick={() => handleClockOutSingleTech(entry.id)}
+                              disabled={loading}
+                              title={`Clock out ${(entry.profiles as any)?.name}`}
+                            >
+                              <Square size={10} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
