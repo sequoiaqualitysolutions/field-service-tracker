@@ -46,7 +46,7 @@ export const AdminDashboard: React.FC = () => {
     // Active sessions
     const { data: activeData } = await supabase
       .from('time_entries')
-      .select('id, tech_id, client_id, start_time, clocked_in_by, session_id, profiles!time_entries_tech_id_fkey(name, role), clients(name)')
+      .select('id, tech_id, client_id, start_time, clocked_in_by, session_id, notes, profiles!time_entries_tech_id_fkey(name, role), clients(name)')
       .is('end_time', null)
       .order('start_time', { ascending: true });
     setActiveSessions(activeData || []);
@@ -265,6 +265,7 @@ export const AdminDashboard: React.FC = () => {
                     <th>Person</th>
                     <th>Role</th>
                     <th>Client</th>
+                    <th>Notes</th>
                     <th>Started</th>
                     <th>Duration</th>
                   </tr>
@@ -285,6 +286,7 @@ export const AdminDashboard: React.FC = () => {
                           </span>
                         </td>
                         <td>{entry.clients?.name || 'Unknown'}</td>
+                        <td className="text-xs text-base-content/60 max-w-[200px] truncate">{entry.notes || '—'}</td>
                         <td className="text-xs">
                           {new Date(entry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </td>
