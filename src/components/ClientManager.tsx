@@ -64,7 +64,7 @@ export const ClientManager: React.FC = () => {
   useEffect(() => { loadClients(); loadTechs(); }, []);
 
   async function loadTechs() {
-    const { data } = await supabase.from('profiles').select('*').eq('role', 'tech').order('name');
+    const { data } = await supabase.from('profiles').select('*').in('role', ['tech', 'team_leader']).order('role').order('name');
     setTechs((data || []) as Profile[]);
   }
 
@@ -264,7 +264,7 @@ export const ClientManager: React.FC = () => {
                 {c.notes && <p className="text-xs text-base-content/40 italic mt-1">{c.notes}</p>}
                 <div className="mt-2 pt-2 border-t border-base-300">
                   <p className="text-xs font-semibold text-base-content/60 flex items-center gap-1 mb-1">
-                    <UserCheck size={12} /> Assigned Techs
+                    <UserCheck size={12} /> Assigned Team
                   </p>
                   {techNames.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
@@ -273,7 +273,7 @@ export const ClientManager: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <span className="text-xs text-warning">⚠ No techs assigned</span>
+                    <span className="text-xs text-warning">⚠ No one assigned</span>
                   )}
                 </div>
               </div>
@@ -315,23 +315,44 @@ export const ClientManager: React.FC = () => {
 
               <div className="border border-base-300 rounded-lg p-3">
                 <p className="text-sm font-semibold mb-2 flex items-center gap-2">
-                  <UserCheck size={16} className="text-accent" /> Assign Technicians
+                  <UserCheck size={16} className="text-accent" /> Assign Team
                 </p>
                 {techs.length === 0 ? (
-                  <p className="text-xs text-base-content/50">No technicians available. Add techs first.</p>
+                  <p className="text-xs text-base-content/50">No team members available. Add users first.</p>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {techs.map(t => (
-                      <button key={t.id} type="button"
-                        className={`btn btn-sm ${selectedTechIds.includes(t.id) ? 'btn-accent' : 'btn-outline btn-ghost'}`}
-                        onClick={() => toggleTech(t.id)}>
-                        {selectedTechIds.includes(t.id) ? '✓ ' : ''}{t.name}
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    {techs.filter(t => t.role === 'team_leader').length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-xs font-semibold text-primary mb-1">Team Leaders</p>
+                        <div className="flex flex-wrap gap-2">
+                          {techs.filter(t => t.role === 'team_leader').map(t => (
+                            <button key={t.id} type="button"
+                              className={`btn btn-sm ${selectedTechIds.includes(t.id) ? 'btn-primary' : 'btn-outline btn-ghost'}`}
+                              onClick={() => toggleTech(t.id)}>
+                              {selectedTechIds.includes(t.id) ? '✓ ' : ''}{t.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {techs.filter(t => t.role === 'tech').length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-accent mb-1">Technicians</p>
+                        <div className="flex flex-wrap gap-2">
+                          {techs.filter(t => t.role === 'tech').map(t => (
+                            <button key={t.id} type="button"
+                              className={`btn btn-sm ${selectedTechIds.includes(t.id) ? 'btn-accent' : 'btn-outline btn-ghost'}`}
+                              onClick={() => toggleTech(t.id)}>
+                              {selectedTechIds.includes(t.id) ? '✓ ' : ''}{t.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
                 {selectedTechIds.length === 0 && (
-                  <p className="text-xs text-warning mt-2">⚠ No techs selected — this client won&apos;t appear in any tech&apos;s portal</p>
+                  <p className="text-xs text-warning mt-2">⚠ No one selected — this client won&apos;t appear in any portal</p>
                 )}
               </div>
             </div>
