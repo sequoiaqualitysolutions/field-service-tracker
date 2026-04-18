@@ -89,7 +89,7 @@ export default function App() {
     switch (currentView) {
       case 'dashboard': return <AdminDashboard />;
       case 'clients': return <ClientManager />;
-      case 'pay-report': return <PayReport />;
+      case 'pay-report': return profile?.role === 'admin' ? <PayReport /> : <AdminDashboard />;
       case 'user-management': return <UserManager />;
       case 'schedule': return <TechSchedule profile={profile!} onClockIn={handleScheduleClockIn} />;
       case 'team-leader-portal': return <TeamLeaderPortal profile={profile!} />;

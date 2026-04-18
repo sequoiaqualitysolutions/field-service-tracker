@@ -31,7 +31,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
     navItems.push(
       { view: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
       { view: 'team-leader-portal', label: 'Team Portal', icon: <UserCheck size={18} /> },
-      { view: 'pay-report', label: 'Pay Report', icon: <DollarSign size={18} /> },
       { view: 'schedule', label: 'Schedule', icon: <CalendarDays size={18} /> },
       { view: 'tech-portal', label: 'My Timesheet', icon: <Clock size={18} /> },
     );
