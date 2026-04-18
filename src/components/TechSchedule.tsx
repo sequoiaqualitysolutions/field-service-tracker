@@ -205,7 +205,7 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
         }
 
         const res = await fetch(
-          `/.netlify/functions/calendar-events?timeMin=${encodeURIComponent(
+          `/api/google-calendar?timeMin=${encodeURIComponent(
             timeMin,
           )}&timeMax=${encodeURIComponent(timeMax)}`,
           {
