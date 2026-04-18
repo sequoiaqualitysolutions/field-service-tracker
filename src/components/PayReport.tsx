@@ -57,22 +57,27 @@ export const PayReport: React.FC = () => {
     });
 
     const gpsFlags = techEntries.filter(e =>
-      (e.start_lat == null || e.stop_lat == null) ||
-      (e.distance_km != null && e.distance_km > 1) ||
-      (e.end_time && (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000 < 10)
+      e.start_lat == null || e.stop_lat == null
     ).length;
+    const distanceFlags = techEntries.filter(e =>
+      e.distance_km != null && e.distance_km > 1
+    ).length;
+    const shortVisitFlags = techEntries.filter(e =>
+      e.end_time && (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000 < 10
+    ).length;
+    const totalFlags = gpsFlags + distanceFlags + shortVisitFlags;
 
-    return { techEntries, totalHours, weeklyHours, regularHours, overtimeHours, gpsFlags };
+    return { techEntries, totalHours, weeklyHours, regularHours, overtimeHours, gpsFlags, distanceFlags, shortVisitFlags, totalFlags };
   }
 
   function exportCSV() {
-    const headers = ['Technician', 'Email', 'Hourly Rate', 'Regular Hours', 'OT Hours', 'Total Hours', 'Regular Pay', 'OT Pay (1.5x)', 'Total Pay', 'GPS Flags'];
+    const headers = ['Technician', 'Email', 'Hourly Rate', 'Regular Hours', 'OT Hours', 'Total Hours', 'Regular Pay', 'OT Pay (1.5x)', 'Total Pay', 'GPS Missing Flags', 'Distance > 1km Flags', 'Short Visit Flags', 'Total Flags'];
     const rows = techs.map(t => {
       const d = getTechData(t.id);
       const rate = Number(t.hourly_rate);
       const regPay = d.regularHours * rate;
       const otPay = d.overtimeHours * rate * 1.5;
-      return [t.name, t.email, rate.toFixed(2), d.regularHours.toFixed(2), d.overtimeHours.toFixed(2), d.totalHours.toFixed(2), regPay.toFixed(2), otPay.toFixed(2), (regPay + otPay).toFixed(2), d.gpsFlags.toString()];
+      return [t.name, t.email, rate.toFixed(2), d.regularHours.toFixed(2), d.overtimeHours.toFixed(2), d.totalHours.toFixed(2), regPay.toFixed(2), otPay.toFixed(2), (regPay + otPay).toFixed(2), d.gpsFlags.toString(), d.distanceFlags.toString(), d.shortVisitFlags.toString(), d.totalFlags.toString()];
     });
 
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
@@ -153,7 +158,17 @@ export const PayReport: React.FC = () => {
                   {d.overtimeHours > 0 && <span className="badge badge-error badge-xs">OT: +${otPay.toFixed(2)}</span>}
                   {d.gpsFlags > 0 && (
                     <span className="badge badge-warning badge-xs mt-1 flex items-center gap-1">
-                      <MapPin size={10} /> {d.gpsFlags} GPS flag{d.gpsFlags > 1 ? 's' : ''}
+                      🟡 {d.gpsFlags} GPS missing
+                    </span>
+                  )}
+                  {d.distanceFlags > 0 && (
+                    <span className="badge badge-error badge-xs mt-1 flex items-center gap-1">
+                      🔴 {d.distanceFlags} distance {'>'} 1km
+                    </span>
+                  )}
+                  {d.shortVisitFlags > 0 && (
+                    <span className="badge badge-error badge-xs mt-1 flex items-center gap-1">
+                      ⏱️ {d.shortVisitFlags} short visit{d.shortVisitFlags > 1 ? 's' : ''}
                     </span>
                   )}
                 </div>
