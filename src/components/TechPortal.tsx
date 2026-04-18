@@ -18,6 +18,8 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
   const [todayEntries, setTodayEntries] = useState<TimeEntry[]>([]);
   const [elapsed, setElapsed] = useState('00:00:00');
   const [notes, setNotes] = useState('');
+  const [sessionNotes, setSessionNotes] = useState('');
+  const [notesSaved, setNotesSaved] = useState(false);
   const [gpsStatus, setGpsStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [startCoords, setStartCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -80,6 +82,7 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
     if (activeRows && activeRows.length > 0) {
       const entry = activeRows[0] as unknown as TimeEntry;
       setActiveEntry(entry);
+      setSessionNotes(entry.notes || '');
       if (entry.start_lat != null && entry.start_lng != null) {
         setStartCoords({ lat: entry.start_lat, lng: entry.start_lng });
       }
@@ -156,6 +159,13 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
     setLoading(false);
   }
 
+  async function saveNotes() {
+    if (!activeEntry) return;
+    await supabase.from('time_entries').update({ notes: sessionNotes }).eq('id', activeEntry.id);
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
+  }
+
   async function handleStop() {
     if (!activeEntry) return;
     setLoading(true);
@@ -187,6 +197,7 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
         stop_lat: lat,
         stop_lng: lng,
         distance_km: distance,
+        notes: sessionNotes || activeEntry.notes,
       })
       .eq('id', activeEntry.id);
 
@@ -262,6 +273,24 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
                 )}
                 <p className="text-3xl font-mono font-bold text-success mt-2">{elapsed}</p>
               </div>
+              {/* Editable notes while clocked in */}
+              <div className="space-y-2">
+                <textarea
+                  className="textarea textarea-bordered w-full text-sm"
+                  placeholder="Add job notes..."
+                  rows={2}
+                  value={sessionNotes}
+                  onChange={e => { setSessionNotes(e.target.value); setNotesSaved(false); }}
+                />
+                <button
+                  className={`btn btn-sm w-full ${notesSaved ? 'btn-success' : 'btn-outline btn-primary'}`}
+                  onClick={saveNotes}
+                  disabled={notesSaved}
+                >
+                  {notesSaved ? '✓ Notes Saved' : '💾 Save Notes'}
+                </button>
+              </div>
+
               {profile.role === 'tech' ? (
                 <p className="text-xs text-center text-base-content/50">Your team leader will clock you out.</p>
               ) : (

@@ -19,6 +19,8 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
   const [todayEntries, setTodayEntries] = useState<TimeEntry[]>([]);
   const [elapsed, setElapsed] = useState('00:00:00');
   const [notes, setNotes] = useState('');
+  const [sessionNotes, setSessionNotes] = useState('');
+  const [notesSaved, setNotesSaved] = useState(false);
   const [gpsStatus, setGpsStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [startCoords, setStartCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -118,6 +120,9 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
         .eq('session_id', session.id)
         .is('end_time', null);
       setSessionEntries((entries || []) as unknown as TimeEntry[]);
+      // Load leader's own entry notes as session notes
+      const leaderEntry = (entries || []).find((e: any) => e.tech_id === profile.id);
+      if (leaderEntry) setSessionNotes((leaderEntry as any).notes || '');
     } else {
       setActiveSession(null);
       setSessionEntries([]);
@@ -226,6 +231,14 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
     setLoading(false);
   }
 
+  async function saveSessionNotes() {
+    if (!activeSession) return;
+    // Save notes to all open entries in this session
+    await supabase.from('time_entries').update({ notes: sessionNotes }).eq('session_id', activeSession.id).is('end_time', null);
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
+  }
+
   async function handleStopSession() {
     if (!activeSession) return;
     setLoading(true);
@@ -266,6 +279,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
       stop_lat: lat,
       stop_lng: lng,
       distance_km: distance,
+      notes: sessionNotes || undefined,
     }).eq('session_id', activeSession.id).is('end_time', null);
 
     setActiveSession(null);
@@ -593,6 +607,24 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
                   )}
                 </div>
               )}
+
+              {/* Session Notes */}
+              <div className="space-y-2">
+                <textarea
+                  className="textarea textarea-bordered w-full text-sm"
+                  placeholder="Add job notes for this session..."
+                  rows={2}
+                  value={sessionNotes}
+                  onChange={e => { setSessionNotes(e.target.value); setNotesSaved(false); }}
+                />
+                <button
+                  className={`btn btn-sm w-full ${notesSaved ? 'btn-success' : 'btn-outline btn-primary'}`}
+                  onClick={saveSessionNotes}
+                  disabled={notesSaved}
+                >
+                  {notesSaved ? '✓ Notes Saved' : '💾 Save Notes'}
+                </button>
+              </div>
 
               {/* Clock Out All */}
               <button
