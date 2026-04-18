@@ -30,7 +30,7 @@ export const AdminDashboard: React.FC = () => {
 
     const { data: entryRows } = await supabase
       .from('time_entries')
-      .select('*, clients(name, account_number), profiles(name)')
+      .select('*, clients(name, account_number), profiles!time_entries_tech_id_fkey(name)')
       .gte('start_time', startDate)
       .lte('start_time', endDate)
       .not('end_time', 'is', null);
@@ -91,8 +91,13 @@ export const AdminDashboard: React.FC = () => {
     }
   });
 
-  // SQS brand-aligned chart colors
-  const colors = ['#f27c22', '#d17609', '#935f10', '#6c5f14', '#36d399', '#3abff8', '#a78bfa', '#fb923c'];
+  // 20 unique chart colors — no duplicates for up to 20 techs/leaders
+  const colors = [
+    '#f27c22', '#3abff8', '#36d399', '#a78bfa', '#fb923c',
+    '#f472b6', '#22d3ee', '#facc15', '#4ade80', '#c084fc',
+    '#f87171', '#2dd4bf', '#60a5fa', '#fbbf24', '#a3e635',
+    '#e879f9', '#34d399', '#f97316', '#818cf8', '#fb7185',
+  ];
 
   function renderChart() {
     if (!chartRef.current) return;

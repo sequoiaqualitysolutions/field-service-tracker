@@ -25,7 +25,7 @@ export const PayReport: React.FC = () => {
 
     const { data: entryRows } = await supabase
       .from('time_entries')
-      .select('*, clients(name, account_number), profiles(name)')
+      .select('*, clients(name, account_number), profiles!time_entries_tech_id_fkey(name)')
       .gte('start_time', startDate)
       .lte('start_time', endDate)
       .not('end_time', 'is', null)

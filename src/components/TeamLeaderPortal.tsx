@@ -102,7 +102,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
       // Get entries in this active session
       const { data: entries } = await supabase
         .from('time_entries')
-        .select('*, clients(name, account_number), profiles(name)')
+        .select('*, clients(name, account_number), profiles!time_entries_tech_id_fkey(name)')
         .eq('session_id', session.id)
         .is('end_time', null);
       setSessionEntries((entries || []) as unknown as TimeEntry[]);
@@ -115,7 +115,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
     const today = new Date().toISOString().split('T')[0];
     const { data: todayRows } = await supabase
       .from('time_entries')
-      .select('*, clients(name, account_number), profiles(name)')
+      .select('*, clients(name, account_number), profiles!time_entries_tech_id_fkey(name)')
       .eq('tech_id', profile.id)
       .not('end_time', 'is', null)
       .gte('start_time', `${today}T00:00:00`)
