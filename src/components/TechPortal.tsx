@@ -103,8 +103,27 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
   async function handleStart() {
     if (!selectedClient) return;
     setLoading(true);
-    setGpsStatus('Acquiring GPS position...');
+    setGpsStatus('Checking status...');
     setStopCoords(null);
+
+    // Safety check: prevent clocking into a second client while already clocked in
+    const { data: openEntries } = await supabase
+      .from('time_entries')
+      .select('id, clients(name)')
+      .eq('tech_id', profile.id)
+      .is('end_time', null)
+      .limit(1);
+
+    if (openEntries && openEntries.length > 0) {
+      const clientName = (openEntries[0].clients as any)?.name || 'another client';
+      setGpsStatus(`⚠️ You are already clocked in at ${clientName}. Clock out first.`);
+      setActiveEntry(openEntries[0] as unknown as TimeEntry);
+      setLoading(false);
+      await loadData();
+      return;
+    }
+
+    setGpsStatus('Acquiring GPS position...');
 
     let lat: number | null = null;
     let lng: number | null = null;
