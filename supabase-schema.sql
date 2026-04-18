@@ -10,6 +10,7 @@ CREATE TABLE public.profiles (
   name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'tech' CHECK (role IN ('admin', 'tech')),
   hourly_rate NUMERIC(10,2) DEFAULT 25.00,
+  google_calendar_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

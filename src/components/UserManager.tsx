@@ -42,7 +42,7 @@ export const UserManager: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
-  const [form, setForm] = useState({ email: '', password: '', name: '', role: 'tech', hourly_rate: '25.00' });
+  const [form, setForm] = useState({ email: '', password: '', name: '', role: 'tech', hourly_rate: '25.00', google_calendar_id: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
@@ -66,14 +66,14 @@ export const UserManager: React.FC = () => {
 
   function openAdd() {
     setEditing(null);
-    setForm({ email: '', password: '', name: '', role: 'tech', hourly_rate: '25.00' });
+    setForm({ email: '', password: '', name: '', role: 'tech', hourly_rate: '25.00', google_calendar_id: '' });
     setError('');
     setShowModal(true);
   }
 
   function openEdit(u: Profile) {
     setEditing(u);
-    setForm({ email: u.email, password: '', name: u.name, role: u.role, hourly_rate: String(u.hourly_rate) });
+    setForm({ email: u.email, password: '', name: u.name, role: u.role, hourly_rate: String(u.hourly_rate), google_calendar_id: u.google_calendar_id || '' });
     setError('');
     setShowModal(true);
   }
@@ -92,6 +92,7 @@ export const UserManager: React.FC = () => {
           name: form.name,
           role: form.role,
           hourly_rate: parseFloat(form.hourly_rate),
+          google_calendar_id: form.google_calendar_id || null,
         }),
       });
       const data = await res.json();
@@ -250,6 +251,9 @@ export const UserManager: React.FC = () => {
                 </span>
                 <span className="text-xs text-base-content/60">${Number(u.hourly_rate).toFixed(2)}/hr</span>
               </div>
+              {u.google_calendar_id && (
+                <p className="text-[10px] text-base-content/40 mt-1 truncate" title={u.google_calendar_id}>📅 Calendar linked</p>
+              )}
             </div>
           </div>
         ))}
@@ -288,6 +292,12 @@ export const UserManager: React.FC = () => {
                 </select>
                 <input className="input input-bordered w-full" placeholder="Hourly Rate" type="number" step="0.01"
                   value={form.hourly_rate} onChange={e => setForm(f => ({ ...f, hourly_rate: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label py-0"><span className="label-text text-xs">Google Calendar ID</span></label>
+                <input className="input input-bordered input-sm w-full" placeholder="e.g. tech-name@group.calendar.google.com"
+                  value={form.google_calendar_id} onChange={e => setForm(f => ({ ...f, google_calendar_id: e.target.value }))} />
+                <p className="text-[10px] text-base-content/40 mt-0.5">Found in Google Calendar → Settings → Calendar ID</p>
               </div>
             </div>
             <div className="modal-action">

@@ -4,6 +4,7 @@ export interface Profile {
   name: string;
   role: 'admin' | 'tech';
   hourly_rate: number;
+  google_calendar_id?: string;
   created_at?: string;
 }
 
@@ -42,7 +43,18 @@ export interface TimeEntry {
   profiles?: { name: string };
 }
 
-export type AppView = 'dashboard' | 'clients' | 'pay-report' | 'tech-portal' | 'user-management';
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  description: string;
+  location: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  matchedClient?: Client | null;
+}
+
+export type AppView = 'dashboard' | 'clients' | 'pay-report' | 'tech-portal' | 'user-management' | 'schedule';
 
 export interface WeekInfo {
   week: number;

@@ -4,6 +4,7 @@ import { Profile, AppView } from './types';
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { TechPortal } from './components/TechPortal';
+import { TechSchedule } from './components/TechSchedule';
 import { AdminDashboard } from './components/AdminDashboard';
 import { PayReport } from './components/PayReport';
 import { ClientManager } from './components/ClientManager';
@@ -13,6 +14,7 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<AppView>('tech-portal');
+  const [preselectedClientId, setPreselectedClientId] = useState<number | null>(null);
 
   useEffect(() => {
     checkSession();
@@ -48,13 +50,19 @@ export default function App() {
     if (data) {
       const p = data as Profile;
       setProfile(p);
-      setCurrentView(p.role === 'admin' ? 'dashboard' : 'tech-portal');
+      setCurrentView(p.role === 'admin' ? 'dashboard' : 'schedule');
     }
     setLoading(false);
   }
 
   function handleLogin() {
     checkSession();
+  }
+
+  /** Called from TechSchedule when a tech clicks "Clock In" on a scheduled job */
+  function handleScheduleClockIn(clientId: number) {
+    setPreselectedClientId(clientId);
+    setCurrentView('tech-portal');
   }
 
   if (loading) {
@@ -75,8 +83,9 @@ export default function App() {
       case 'clients': return <ClientManager />;
       case 'pay-report': return <PayReport />;
       case 'user-management': return <UserManager />;
-      case 'tech-portal': return <TechPortal profile={profile!} />;
-      default: return <TechPortal profile={profile!} />;
+      case 'schedule': return <TechSchedule profile={profile!} onClockIn={handleScheduleClockIn} />;
+      case 'tech-portal': return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} />;
+      default: return <TechSchedule profile={profile!} onClockIn={handleScheduleClockIn} />;
     }
   }
 

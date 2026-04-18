@@ -72,7 +72,7 @@ export default async (req: Request, _context: Context) => {
 
   // UPDATE USER PROFILE
   if (req.method === 'PUT') {
-    const { id, name, role, hourly_rate } = body;
+    const { id, name, role, hourly_rate, google_calendar_id } = body;
     if (!id) {
       return new Response(JSON.stringify({ error: 'id is required' }), {
         status: 400,
@@ -84,6 +84,7 @@ export default async (req: Request, _context: Context) => {
     if (name !== undefined) updates.name = name;
     if (role !== undefined) updates.role = role;
     if (hourly_rate !== undefined) updates.hourly_rate = hourly_rate;
+    if (google_calendar_id !== undefined) updates.google_calendar_id = google_calendar_id;
 
     const { error } = await supabaseAdmin
       .from('profiles')

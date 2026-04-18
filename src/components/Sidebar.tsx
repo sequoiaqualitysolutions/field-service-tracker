@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut, CalendarDays } from 'lucide-react';
 import { AppView, Profile } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -12,13 +12,14 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNavigate }) => {
   const isAdmin = profile.role === 'admin';
 
-  const navItems: { view: AppView; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
+  const navItems: { view: AppView; label: string; icon: React.ReactNode }[] = [
     ...(isAdmin ? [
       { view: 'dashboard' as AppView, label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
       { view: 'clients' as AppView, label: 'Clients', icon: <Briefcase size={18} /> },
       { view: 'pay-report' as AppView, label: 'Pay Report', icon: <DollarSign size={18} /> },
       { view: 'user-management' as AppView, label: 'Technicians', icon: <Users size={18} /> },
     ] : []),
+    { view: 'schedule' as AppView, label: isAdmin ? 'Schedule' : 'My Schedule', icon: <CalendarDays size={18} /> },
     { view: 'tech-portal' as AppView, label: isAdmin ? 'Tech Portal' : 'My Timesheet', icon: <Clock size={18} /> },
   ];
 

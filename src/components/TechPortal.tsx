@@ -7,9 +7,11 @@ import { supabase } from '../lib/supabase';
 
 interface TechPortalProps {
   profile: Profile;
+  preselectedClientId?: number | null;
+  onClearPreselect?: () => void;
 }
 
-export const TechPortal: React.FC<TechPortalProps> = ({ profile }) => {
+export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClientId, onClearPreselect }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<number>(0);
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null);
@@ -21,11 +23,21 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile }) => {
   const [startCoords, setStartCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [stopCoords, setStopCoords] = useState<{ lat: number; lng: number } | null>(null);
   const timerRef = useRef<number | null>(null);
+  const preselectedApplied = useRef(false);
 
   useEffect(() => {
     loadData();
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
+
+  // Apply preselected client from schedule
+  useEffect(() => {
+    if (preselectedClientId && !preselectedApplied.current && clients.length > 0 && !activeEntry) {
+      setSelectedClient(preselectedClientId);
+      preselectedApplied.current = true;
+      onClearPreselect?.();
+    }
+  }, [preselectedClientId, clients, activeEntry, onClearPreselect]);
 
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
