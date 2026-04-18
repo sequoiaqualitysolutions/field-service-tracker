@@ -271,8 +271,8 @@ export const AdminDashboard: React.FC = () => {
         <div className="alert alert-warning shadow-lg">
           <MapPin size={20} />
           <div>
-            <h3 className="font-bold">📍 GPS Distance Alert — {gpsAlerts.length} flagged entry(ies)</h3>
-            <p className="text-xs">Entries where distance between clock-in and clock-out exceeds 2 km, or GPS was missing.</p>
+            <h3 className="font-bold">🚩 Service Alerts — {gpsAlerts.length} flagged entry(ies)</h3>
+            <p className="text-xs">Entries where distance exceeds 1 km, GPS was missing, or visit was under 10 minutes.</p>
           </div>
         </div>
       )}
@@ -281,7 +281,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="card bg-base-200 border border-warning/20">
           <div className="card-body p-4">
             <h3 className="font-semibold text-sm text-warning flex items-center gap-2">
-              <MapPin size={16} /> GPS Distance Flags
+              <MapPin size={16} /> Service Flags
             </h3>
             <div className="overflow-x-auto mt-2">
               <table className="table table-xs">
@@ -292,7 +292,7 @@ export const AdminDashboard: React.FC = () => {
                       <td className="font-semibold">{a.techName}</td>
                       <td>{a.clientName}</td>
                       <td>{a.date}</td>
-                      <td>{a.reason === 'Missing GPS' ? '🟡 No GPS' : '🔴 Moved > 2 km'}</td>
+                      <td>{a.reason === 'Missing GPS' ? '🟡 No GPS' : a.reason.startsWith('Short') ? '⏱️ ' + a.reason : '🔴 ' + a.reason}</td>
                       <td>{a.distance ? `${a.distance.toFixed(2)} km` : '—'}</td>
                     </tr>
                   ))}
