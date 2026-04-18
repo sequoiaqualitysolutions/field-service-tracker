@@ -80,8 +80,14 @@ export const AdminDashboard: React.FC = () => {
     const date = new Date(e.start_time).toLocaleDateString();
     if (e.start_lat == null || e.start_lng == null || e.stop_lat == null || e.stop_lng == null) {
       gpsAlerts.push({ techName, clientName, date, reason: 'Missing GPS' });
-    } else if (e.distance_km != null && e.distance_km > 2) {
-      gpsAlerts.push({ techName, clientName, date, reason: 'Distance > 2 km', distance: e.distance_km });
+    } else if (e.distance_km != null && e.distance_km > 1) {
+      gpsAlerts.push({ techName, clientName, date, reason: 'Distance > 1 km', distance: e.distance_km });
+    }
+    // Short duration flag — less than 10 minutes
+    const hours = e.end_time ? (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 3600000 : 0;
+    if (e.end_time && hours < (10 / 60)) {
+      const mins = Math.round(hours * 60);
+      gpsAlerts.push({ techName, clientName, date, reason: `Short visit: ${mins} min` });
     }
   });
 

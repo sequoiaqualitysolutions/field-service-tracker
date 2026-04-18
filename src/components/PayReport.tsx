@@ -58,7 +58,8 @@ export const PayReport: React.FC = () => {
 
     const gpsFlags = techEntries.filter(e =>
       (e.start_lat == null || e.stop_lat == null) ||
-      (e.distance_km != null && e.distance_km > 2)
+      (e.distance_km != null && e.distance_km > 1) ||
+      (e.end_time && (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000 < 10)
     ).length;
 
     return { techEntries, totalHours, weeklyHours, regularHours, overtimeHours, gpsFlags };
