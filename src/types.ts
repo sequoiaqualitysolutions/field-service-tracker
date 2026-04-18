@@ -2,7 +2,7 @@ export interface Profile {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'tech';
+  role: 'admin' | 'team_leader' | 'tech';
   hourly_rate: number;
   google_calendar_id?: string;
   created_at?: string;
@@ -38,10 +38,28 @@ export interface TimeEntry {
   stop_lat: number | null;
   stop_lng: number | null;
   distance_km: number | null;
+  session_id: string | null;
+  clocked_in_by: string | null;
   notes: string;
   created_at?: string;
   clients?: { name: string; account_number: string };
   profiles?: { name: string };
+}
+
+export interface TeamSession {
+  id: string;
+  leader_id: string;
+  client_id: number;
+  start_time: string;
+  end_time: string | null;
+  start_lat: number | null;
+  start_lng: number | null;
+  stop_lat: number | null;
+  stop_lng: number | null;
+  distance_km: number | null;
+  notes: string;
+  created_at?: string;
+  clients?: { name: string; account_number: string };
 }
 
 export interface CalendarEvent {
@@ -55,7 +73,7 @@ export interface CalendarEvent {
   matchedClient?: Client | null;
 }
 
-export type AppView = 'dashboard' | 'clients' | 'pay-report' | 'tech-portal' | 'user-management' | 'schedule';
+export type AppView = 'dashboard' | 'clients' | 'pay-report' | 'tech-portal' | 'user-management' | 'schedule' | 'team-leader-portal';
 
 export interface WeekInfo {
   week: number;

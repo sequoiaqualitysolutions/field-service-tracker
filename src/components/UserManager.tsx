@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Edit, Trash2, X, Shield, Wrench, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, X, Shield, Wrench, Upload, Download, CheckCircle, AlertCircle, UserCheck } from 'lucide-react';
 import { Profile } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -174,7 +174,7 @@ export const UserManager: React.FC = () => {
             email: row.email,
             password: row.password || 'TempPass123!',
             name: row.name,
-            role: row.role === 'admin' ? 'admin' : 'tech',
+            role: ['admin', 'team_leader'].includes(row.role) ? row.role : 'tech',
             hourly_rate: parseFloat(row.hourly_rate) || 25,
           }),
         });
@@ -197,7 +197,7 @@ export const UserManager: React.FC = () => {
   }
 
   function downloadTemplate() {
-    const csv = 'name,email,password,role,hourly_rate\nJohn Smith,john@example.com,TempPass123!,tech,25.00\nJane Doe,jane@example.com,TempPass123!,tech,30.00';
+    const csv = 'name,email,password,role,hourly_rate\nJohn Smith,john@example.com,TempPass123!,tech,25.00\nJane Doe,jane@example.com,TempPass123!,team_leader,30.00\nBob Jones,bob@example.com,TempPass123!,tech,25.00';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -208,6 +208,7 @@ export const UserManager: React.FC = () => {
   }
 
   const techCount = users.filter(u => u.role === 'tech').length;
+  const leaderCount = users.filter(u => u.role === 'team_leader').length;
   const adminCount = users.filter(u => u.role === 'admin').length;
 
   return (
@@ -226,8 +227,9 @@ export const UserManager: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         <div className="badge badge-lg gap-1"><Wrench size={14} /> {techCount} Technicians</div>
+        <div className="badge badge-lg badge-accent gap-1"><Users size={14} /> {leaderCount} Team Leaders</div>
         <div className="badge badge-lg badge-secondary gap-1"><Shield size={14} /> {adminCount} Admins</div>
       </div>
 
@@ -246,8 +248,8 @@ export const UserManager: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <span className={`badge badge-sm ${u.role === 'admin' ? 'badge-secondary' : 'badge-primary'}`}>
-                  {u.role === 'admin' ? <><Shield size={10} /> Admin</> : <><Wrench size={10} /> Tech</>}
+                <span className={`badge badge-sm ${u.role === 'admin' ? 'badge-secondary' : u.role === 'team_leader' ? 'badge-accent' : 'badge-primary'}`}>
+                  {u.role === 'admin' ? <><Shield size={10} /> Admin</> : u.role === 'team_leader' ? <><Users size={10} /> Team Leader</> : <><Wrench size={10} /> Tech</>}
                 </span>
                 <span className="text-xs text-base-content/60">${Number(u.hourly_rate).toFixed(2)}/hr</span>
               </div>
@@ -288,6 +290,7 @@ export const UserManager: React.FC = () => {
                 <select className="select select-bordered w-full" value={form.role}
                   onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
                   <option value="tech">Technician</option>
+                  <option value="team_leader">Team Leader</option>
                   <option value="admin">Admin</option>
                 </select>
                 <input className="input input-bordered w-full" placeholder="Hourly Rate" type="number" step="0.01"
@@ -334,7 +337,7 @@ export const UserManager: React.FC = () => {
                   <p className="text-xs text-base-content/60 mt-2">
                     • <strong>name</strong> and <strong>email</strong> are required<br />
                     • <strong>password</strong> defaults to "TempPass123!" if blank (techs can change later)<br />
-                    • <strong>role</strong> defaults to "tech" if blank<br />
+                    • <strong>role</strong> options: tech, team_leader, admin (defaults to "tech")<br />
                     • <strong>hourly_rate</strong> defaults to $25.00 if blank
                   </p>
                 </div>
@@ -376,7 +379,7 @@ export const UserManager: React.FC = () => {
                           <td>{i + 1}</td>
                           <td>{r.name}</td>
                           <td className="font-mono text-xs">{r.email}</td>
-                          <td><span className={`badge badge-xs ${r.role === 'admin' ? 'badge-secondary' : 'badge-primary'}`}>{r.role}</span></td>
+                          <td><span className={`badge badge-xs ${r.role === 'admin' ? 'badge-secondary' : r.role === 'team_leader' ? 'badge-accent' : 'badge-primary'}`}>{r.role === 'team_leader' ? 'leader' : r.role}</span></td>
                           <td>${parseFloat(r.hourly_rate || '25').toFixed(2)}</td>
                         </tr>
                       ))}

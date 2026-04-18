@@ -54,7 +54,7 @@ export default async (req: Request, _context: Context) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { name, role: role || 'tech', hourly_rate: hourly_rate || 25 },
+      user_metadata: { name, role: ['admin', 'team_leader', 'tech'].includes(role) ? role : 'tech', hourly_rate: hourly_rate || 25 },
     });
 
     if (createError) {

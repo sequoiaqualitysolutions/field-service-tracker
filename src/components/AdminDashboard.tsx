@@ -21,7 +21,7 @@ export const AdminDashboard: React.FC = () => {
     const { data: techRows } = await supabase
       .from('profiles')
       .select('*')
-      .eq('role', 'tech')
+      .in('role', ['tech', 'team_leader'])
       .order('name');
     setTechs((techRows || []) as Profile[]);
 

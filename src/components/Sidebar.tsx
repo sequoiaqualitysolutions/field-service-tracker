@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut, CalendarDays, UserCheck } from 'lucide-react';
 import { AppView, Profile } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -11,17 +11,41 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNavigate }) => {
   const isAdmin = profile.role === 'admin';
+  const isLeader = profile.role === 'team_leader';
+  const isTech = profile.role === 'tech';
 
-  const navItems: { view: AppView; label: string; icon: React.ReactNode }[] = [
-    ...(isAdmin ? [
-      { view: 'dashboard' as AppView, label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      { view: 'clients' as AppView, label: 'Clients', icon: <Briefcase size={18} /> },
-      { view: 'pay-report' as AppView, label: 'Pay Report', icon: <DollarSign size={18} /> },
-      { view: 'user-management' as AppView, label: 'Technicians', icon: <Users size={18} /> },
-    ] : []),
-    { view: 'schedule' as AppView, label: isAdmin ? 'Schedule' : 'My Schedule', icon: <CalendarDays size={18} /> },
-    { view: 'tech-portal' as AppView, label: isAdmin ? 'Tech Portal' : 'My Timesheet', icon: <Clock size={18} /> },
-  ];
+  const navItems: { view: AppView; label: string; icon: React.ReactNode }[] = [];
+
+  if (isAdmin) {
+    navItems.push(
+      { view: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { view: 'clients', label: 'Clients', icon: <Briefcase size={18} /> },
+      { view: 'pay-report', label: 'Pay Report', icon: <DollarSign size={18} /> },
+      { view: 'user-management', label: 'Technicians', icon: <Users size={18} /> },
+      { view: 'schedule', label: 'Schedule', icon: <CalendarDays size={18} /> },
+      { view: 'tech-portal', label: 'Tech Portal', icon: <Clock size={18} /> },
+    );
+  }
+
+  if (isLeader) {
+    navItems.push(
+      { view: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { view: 'team-leader-portal', label: 'Team Portal', icon: <UserCheck size={18} /> },
+      { view: 'pay-report', label: 'Pay Report', icon: <DollarSign size={18} /> },
+      { view: 'schedule', label: 'Schedule', icon: <CalendarDays size={18} /> },
+      { view: 'tech-portal', label: 'My Timesheet', icon: <Clock size={18} /> },
+    );
+  }
+
+  if (isTech) {
+    navItems.push(
+      { view: 'schedule', label: 'My Schedule', icon: <CalendarDays size={18} /> },
+      { view: 'tech-portal', label: 'My Timesheet', icon: <Clock size={18} /> },
+    );
+  }
+
+  const roleLabel = isAdmin ? 'ADMIN' : isLeader ? 'TEAM LEADER' : 'TECH';
+  const roleBadge = isAdmin ? 'badge-secondary' : isLeader ? 'badge-accent' : 'badge-primary';
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -39,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
           </div>
         </div>
         <p className="text-xs text-base-content/50 mt-1 truncate">{profile.name}</p>
-        <span className="badge badge-xs badge-primary mt-1">{profile.role.toUpperCase()}</span>
+        <span className={`badge badge-xs ${roleBadge} mt-1`}>{roleLabel}</span>
       </div>
 
       <ul className="menu menu-sm flex-1 p-2 gap-0.5">

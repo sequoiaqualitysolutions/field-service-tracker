@@ -4,6 +4,7 @@ import { Profile, AppView } from './types';
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { TechPortal } from './components/TechPortal';
+import { TeamLeaderPortal } from './components/TeamLeaderPortal';
 import { TechSchedule } from './components/TechSchedule';
 import { AdminDashboard } from './components/AdminDashboard';
 import { PayReport } from './components/PayReport';
@@ -50,7 +51,14 @@ export default function App() {
     if (data) {
       const p = data as Profile;
       setProfile(p);
-      setCurrentView(p.role === 'admin' ? 'dashboard' : 'schedule');
+      // Set default view based on role
+      if (p.role === 'admin') {
+        setCurrentView('dashboard');
+      } else if (p.role === 'team_leader') {
+        setCurrentView('team-leader-portal');
+      } else {
+        setCurrentView('tech-portal');
+      }
     }
     setLoading(false);
   }
@@ -84,8 +92,9 @@ export default function App() {
       case 'pay-report': return <PayReport />;
       case 'user-management': return <UserManager />;
       case 'schedule': return <TechSchedule profile={profile!} onClockIn={handleScheduleClockIn} />;
+      case 'team-leader-portal': return <TeamLeaderPortal profile={profile!} />;
       case 'tech-portal': return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} />;
-      default: return <TechSchedule profile={profile!} onClockIn={handleScheduleClockIn} />;
+      default: return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} />;
     }
   }
 

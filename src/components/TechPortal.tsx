@@ -213,35 +213,43 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
       <div className={`card ${activeEntry ? 'bg-success/10 border border-success/30' : 'bg-base-200'}`}>
         <div className="card-body p-4 space-y-3">
           {!activeEntry ? (
-            <>
-              <select
-                className="select select-bordered w-full"
-                value={selectedClient}
-                onChange={e => setSelectedClient(Number(e.target.value))}
-              >
-                <option value={0}>Select an assigned client...</option>
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.account_number})</option>
-                ))}
-              </select>
-              {clients.length === 0 && (
-                <p className="text-xs text-warning">No clients assigned to you yet. Contact your admin.</p>
-              )}
-              <textarea
-                className="textarea textarea-bordered w-full"
-                placeholder="Job notes (optional)..."
-                rows={2}
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-              />
-              <button
-                className="btn btn-success w-full"
-                onClick={handleStart}
-                disabled={!selectedClient || loading}
-              >
-                <Play size={18} /> Clock In
-              </button>
-            </>
+            profile.role === 'tech' ? (
+              <div className="text-center py-4">
+                <Clock size={32} className="mx-auto mb-2 text-base-content/30" />
+                <p className="text-base-content/60 font-medium">Waiting for your team leader to clock you in</p>
+                <p className="text-xs text-base-content/40 mt-1">Your time entries will appear below once you&apos;re assigned to a job.</p>
+              </div>
+            ) : (
+              <>
+                <select
+                  className="select select-bordered w-full"
+                  value={selectedClient}
+                  onChange={e => setSelectedClient(Number(e.target.value))}
+                >
+                  <option value={0}>Select an assigned client...</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.account_number})</option>
+                  ))}
+                </select>
+                {clients.length === 0 && (
+                  <p className="text-xs text-warning">No clients assigned to you yet. Contact your admin.</p>
+                )}
+                <textarea
+                  className="textarea textarea-bordered w-full"
+                  placeholder="Job notes (optional)..."
+                  rows={2}
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                />
+                <button
+                  className="btn btn-success w-full"
+                  onClick={handleStart}
+                  disabled={!selectedClient || loading}
+                >
+                  <Play size={18} /> Clock In
+                </button>
+              </>
+            )
           ) : (
             <>
               <div className="text-center">
@@ -249,15 +257,22 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
                 <p className="font-semibold">
                   {(activeEntry.clients as any)?.name || 'Unknown Client'}
                 </p>
+                {(activeEntry as any).clocked_in_by && (
+                  <p className="text-xs text-base-content/50 mt-1">⏱️ Managed by your team leader</p>
+                )}
                 <p className="text-3xl font-mono font-bold text-success mt-2">{elapsed}</p>
               </div>
-              <button
-                className="btn btn-error w-full"
-                onClick={handleStop}
-                disabled={loading}
-              >
-                <Square size={18} /> Clock Out
-              </button>
+              {profile.role === 'tech' ? (
+                <p className="text-xs text-center text-base-content/50">Your team leader will clock you out.</p>
+              ) : (
+                <button
+                  className="btn btn-error w-full"
+                  onClick={handleStop}
+                  disabled={loading}
+                >
+                  <Square size={18} /> Clock Out
+                </button>
+              )}
             </>
           )}
           {gpsStatus && (

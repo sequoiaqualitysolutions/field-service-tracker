@@ -8,7 +8,7 @@ CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   name TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'tech' CHECK (role IN ('admin', 'tech')),
+  role TEXT NOT NULL DEFAULT 'tech' CHECK (role IN ('admin', 'team_leader', 'tech')),
   hourly_rate NUMERIC(10,2) DEFAULT 25.00,
   google_calendar_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
