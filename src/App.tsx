@@ -16,6 +16,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<AppView>('tech-portal');
   const [preselectedClientId, setPreselectedClientId] = useState<number | null>(null);
+  const [gpsData, setGpsData] = useState<{ startCoords: { lat: number; lng: number } | null; stopCoords: { lat: number; lng: number } | null }>({ startCoords: null, stopCoords: null });
 
   useEffect(() => {
     checkSession();
@@ -92,15 +93,15 @@ export default function App() {
       case 'pay-report': return profile?.role === 'admin' ? <PayReport /> : <AdminDashboard />;
       case 'user-management': return <UserManager />;
       case 'schedule': return <TechSchedule profile={profile!} onClockIn={handleScheduleClockIn} />;
-      case 'team-leader-portal': return <TeamLeaderPortal profile={profile!} />;
-      case 'tech-portal': return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} />;
-      default: return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} />;
+      case 'team-leader-portal': return <TeamLeaderPortal profile={profile!} onGpsUpdate={setGpsData} />;
+      case 'tech-portal': return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} onGpsUpdate={setGpsData} />;
+      default: return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} onGpsUpdate={setGpsData} />;
     }
   }
 
   return (
     <div className="flex h-screen bg-base-300">
-      <Sidebar profile={profile} currentView={currentView} onNavigate={setCurrentView} />
+      <Sidebar profile={profile} currentView={currentView} onNavigate={setCurrentView} gpsData={gpsData} />
       <div className="flex-1 overflow-auto">
         {renderView()}
       </div>

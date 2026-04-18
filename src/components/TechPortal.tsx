@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Square, MapPin, Clock } from 'lucide-react';
 import { Profile, Client, TimeEntry } from '../types';
-import { MapView } from './MapView';
 import { formatTime, formatDuration, calcHours, getCurrentGps, calcDistanceKm } from '../utils/helpers';
 import { supabase } from '../lib/supabase';
 
@@ -9,9 +8,10 @@ interface TechPortalProps {
   profile: Profile;
   preselectedClientId?: number | null;
   onClearPreselect?: () => void;
+  onGpsUpdate?: (data: { startCoords: { lat: number; lng: number } | null; stopCoords: { lat: number; lng: number } | null }) => void;
 }
 
-export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClientId, onClearPreselect }) => {
+export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClientId, onClearPreselect, onGpsUpdate }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<number>(0);
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null);
@@ -30,6 +30,16 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
   useEffect(() => {
     loadData();
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  // Sync GPS data to sidebar
+  useEffect(() => {
+    onGpsUpdate?.({ startCoords, stopCoords });
+  }, [startCoords, stopCoords]);
+
+  // Clean up GPS on unmount
+  useEffect(() => {
+    return () => { onGpsUpdate?.({ startCoords: null, stopCoords: null }); };
   }, []);
 
   // Apply preselected client from schedule
@@ -312,19 +322,7 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
         </div>
       </div>
 
-      {/* Map */}
-      {(startCoords || stopCoords) && (
-        <div className="card bg-base-200">
-          <div className="card-body p-3">
-            <p className="text-xs font-semibold mb-1">📍 GPS Location</p>
-            <MapView startCoords={startCoords} stopCoords={stopCoords} height="200px" />
-            <div className="flex gap-4 mt-1 text-xs text-base-content/60">
-              {startCoords && <span className="flex items-center gap-1"><span className="w-2 h-2 bg-success rounded-full inline-block" /> Start</span>}
-              {stopCoords && <span className="flex items-center gap-1"><span className="w-2 h-2 bg-error rounded-full inline-block" /> Stop</span>}
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Today's Entries */}
       <div className="card bg-base-200">

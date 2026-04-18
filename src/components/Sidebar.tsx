@@ -2,14 +2,16 @@ import React from 'react';
 import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut, CalendarDays, UserCheck } from 'lucide-react';
 import { AppView, Profile } from '../types';
 import { supabase } from '../lib/supabase';
+import { MapView } from './MapView';
 
 interface SidebarProps {
   profile: Profile;
   currentView: AppView;
   onNavigate: (view: AppView) => void;
+  gpsData?: { startCoords: { lat: number; lng: number } | null; stopCoords: { lat: number; lng: number } | null };
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNavigate }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNavigate, gpsData }) => {
   const isAdmin = profile.role === 'admin';
   const isLeader = profile.role === 'team_leader';
   const isTech = profile.role === 'tech';
@@ -79,7 +81,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
         ))}
       </ul>
 
-      <div className="p-2 border-t border-base-300">
+      {/* GPS Map */}
+      {gpsData && (gpsData.startCoords || gpsData.stopCoords) && (
+        <div className="p-2 border-t border-base-300">
+          <p className="text-xs font-semibold mb-1 px-1 text-base-content/70">📍 GPS Location</p>
+          <MapView startCoords={gpsData.startCoords} stopCoords={gpsData.stopCoords} height="160px" />
+          <div className="flex gap-3 mt-1 px-1 text-xs text-base-content/50">
+            {gpsData.startCoords && (
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-success rounded-full inline-block" /> Start
+              </span>
+            )}
+            {gpsData.stopCoords && (
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-error rounded-full inline-block" /> Stop
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="p-2 border-t border-base-300 mt-auto">
         <button className="btn btn-ghost btn-sm w-full justify-start text-error" onClick={handleLogout}>
           <LogOut size={16} /> Sign Out
         </button>
