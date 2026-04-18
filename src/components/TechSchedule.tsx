@@ -196,8 +196,16 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
           return;
         }
 
+        // Check if user has a Google Calendar ID configured
+        if (!profile.google_calendar_id) {
+          setMessage('Google Calendar is not configured yet. Your admin will set this up — use the Clock In page for now.');
+          setEvents([]);
+          setLoading(false);
+          return;
+        }
+
         const res = await fetch(
-          `/api/google-calendar?timeMin=${encodeURIComponent(
+          `/.netlify/functions/calendar-events?timeMin=${encodeURIComponent(
             timeMin,
           )}&timeMax=${encodeURIComponent(timeMax)}`,
           {
@@ -205,7 +213,23 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
           },
         );
 
-        const data = await res.json();
+        if (!res.ok) {
+          setMessage('Google Calendar is not available yet. Your admin will set this up — use the Clock In page for now.');
+          setEvents([]);
+          setLoading(false);
+          return;
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch {
+          setMessage('Google Calendar is not configured yet. Your admin will set this up — use the Clock In page for now.');
+          setEvents([]);
+          setLoading(false);
+          return;
+        }
+
         if (data.message) setMessage(data.message);
         if (data.error && !data.events) {
           setError(data.error);
