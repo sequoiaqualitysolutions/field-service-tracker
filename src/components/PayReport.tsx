@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Download, Calendar } from 'lucide-react';
+import { DollarSign, Download, Calendar, MapPin } from 'lucide-react';
 import { Profile, TimeEntry } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatDuration, calcHours, getWeeksInMonth } from '../utils/helpers';
@@ -56,17 +56,22 @@ export const PayReport: React.FC = () => {
       else { regularHours += 40; overtimeHours += h - 40; }
     });
 
-    return { techEntries, totalHours, weeklyHours, regularHours, overtimeHours };
+    const gpsFlags = techEntries.filter(e =>
+      (e.start_lat == null || e.stop_lat == null) ||
+      (e.distance_km != null && e.distance_km > 2)
+    ).length;
+
+    return { techEntries, totalHours, weeklyHours, regularHours, overtimeHours, gpsFlags };
   }
 
   function exportCSV() {
-    const headers = ['Technician', 'Email', 'Hourly Rate', 'Regular Hours', 'OT Hours', 'Total Hours', 'Regular Pay', 'OT Pay (1.5x)', 'Total Pay'];
+    const headers = ['Technician', 'Email', 'Hourly Rate', 'Regular Hours', 'OT Hours', 'Total Hours', 'Regular Pay', 'OT Pay (1.5x)', 'Total Pay', 'GPS Flags'];
     const rows = techs.map(t => {
       const d = getTechData(t.id);
       const rate = Number(t.hourly_rate);
       const regPay = d.regularHours * rate;
       const otPay = d.overtimeHours * rate * 1.5;
-      return [t.name, t.email, rate.toFixed(2), d.regularHours.toFixed(2), d.overtimeHours.toFixed(2), d.totalHours.toFixed(2), regPay.toFixed(2), otPay.toFixed(2), (regPay + otPay).toFixed(2)];
+      return [t.name, t.email, rate.toFixed(2), d.regularHours.toFixed(2), d.overtimeHours.toFixed(2), d.totalHours.toFixed(2), regPay.toFixed(2), otPay.toFixed(2), (regPay + otPay).toFixed(2), d.gpsFlags.toString()];
     });
 
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
@@ -145,6 +150,11 @@ export const PayReport: React.FC = () => {
                 <div className="text-right">
                   <p className="text-lg font-bold">${totalPay.toFixed(2)}</p>
                   {d.overtimeHours > 0 && <span className="badge badge-error badge-xs">OT: +${otPay.toFixed(2)}</span>}
+                  {d.gpsFlags > 0 && (
+                    <span className="badge badge-warning badge-xs mt-1 flex items-center gap-1">
+                      <MapPin size={10} /> {d.gpsFlags} GPS flag{d.gpsFlags > 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -37,6 +37,7 @@ export interface TimeEntry {
   start_lng: number | null;
   stop_lat: number | null;
   stop_lng: number | null;
+  distance_km: number | null;
   notes: string;
   created_at?: string;
   clients?: { name: string; account_number: string };

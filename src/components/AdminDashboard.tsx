@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BarChart3, AlertTriangle, Users, Clock, TrendingUp } from 'lucide-react';
+import { BarChart3, AlertTriangle, Users, Clock, TrendingUp, MapPin } from 'lucide-react';
 import { Profile, TimeEntry, WeekInfo } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatDuration, getWeeksInMonth, calcHours } from '../utils/helpers';
@@ -71,6 +71,19 @@ export const AdminDashboard: React.FC = () => {
 
   const totalOtHours = otAlerts.reduce((s, a) => s + a.otHours, 0);
   const totalHours = techs.reduce((s, t) => s + getTotalHours(t.id), 0);
+
+  // GPS distance analysis
+  const gpsAlerts: { techName: string; clientName: string; date: string; reason: string; distance?: number }[] = [];
+  entries.forEach(e => {
+    const techName = (e.profiles as any)?.name || 'Unknown';
+    const clientName = (e.clients as any)?.name || 'Unknown';
+    const date = new Date(e.start_time).toLocaleDateString();
+    if (e.start_lat == null || e.start_lng == null || e.stop_lat == null || e.stop_lng == null) {
+      gpsAlerts.push({ techName, clientName, date, reason: 'Missing GPS' });
+    } else if (e.distance_km != null && e.distance_km > 2) {
+      gpsAlerts.push({ techName, clientName, date, reason: 'Distance > 2 km', distance: e.distance_km });
+    }
+  });
 
   // SQS brand-aligned chart colors
   const colors = ['#f27c22', '#d17609', '#935f10', '#6c5f14', '#36d399', '#3abff8', '#a78bfa', '#fb923c'];
@@ -183,7 +196,7 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="stat bg-base-200 rounded-lg p-3 border border-primary/10">
           <div className="stat-title text-xs"><Users size={14} className="inline mr-1" />Technicians</div>
           <div className="stat-value text-xl">{techs.length}</div>
@@ -200,6 +213,12 @@ export const AdminDashboard: React.FC = () => {
           <div className="stat-title text-xs"><TrendingUp size={14} className="inline mr-1" />OT Hours</div>
           <div className={`stat-value text-xl ${totalOtHours > 0 ? 'text-error' : ''}`}>
             {totalOtHours.toFixed(1)}
+          </div>
+        </div>
+        <div className={`stat rounded-lg p-3 ${gpsAlerts.length > 0 ? 'bg-warning/20 border border-warning/30' : 'bg-base-200 border border-primary/10'}`}>
+          <div className="stat-title text-xs"><MapPin size={14} className="inline mr-1" />GPS Flags</div>
+          <div className={`stat-value text-xl ${gpsAlerts.length > 0 ? 'text-warning' : ''}`}>
+            {gpsAlerts.length}
           </div>
         </div>
       </div>
@@ -232,6 +251,43 @@ export const AdminDashboard: React.FC = () => {
                       <td>{a.week}</td>
                       <td>{a.hours.toFixed(1)}h</td>
                       <td className="font-bold">+{a.otHours.toFixed(1)}h</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GPS Distance Alerts */}
+      {gpsAlerts.length > 0 && (
+        <div className="alert alert-warning shadow-lg">
+          <MapPin size={20} />
+          <div>
+            <h3 className="font-bold">📍 GPS Distance Alert — {gpsAlerts.length} flagged entry(ies)</h3>
+            <p className="text-xs">Entries where distance between clock-in and clock-out exceeds 2 km, or GPS was missing.</p>
+          </div>
+        </div>
+      )}
+
+      {gpsAlerts.length > 0 && (
+        <div className="card bg-base-200 border border-warning/20">
+          <div className="card-body p-4">
+            <h3 className="font-semibold text-sm text-warning flex items-center gap-2">
+              <MapPin size={16} /> GPS Distance Flags
+            </h3>
+            <div className="overflow-x-auto mt-2">
+              <table className="table table-xs">
+                <thead><tr><th>Technician</th><th>Client</th><th>Date</th><th>Issue</th><th>Distance</th></tr></thead>
+                <tbody>
+                  {gpsAlerts.map((a, i) => (
+                    <tr key={i} className="text-warning">
+                      <td className="font-semibold">{a.techName}</td>
+                      <td>{a.clientName}</td>
+                      <td>{a.date}</td>
+                      <td>{a.reason === 'Missing GPS' ? '🟡 No GPS' : '🔴 Moved > 2 km'}</td>
+                      <td>{a.distance ? `${a.distance.toFixed(2)} km` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

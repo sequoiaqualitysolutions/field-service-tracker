@@ -46,6 +46,7 @@ CREATE TABLE public.time_entries (
   start_lng DOUBLE PRECISION,
   stop_lat DOUBLE PRECISION,
   stop_lng DOUBLE PRECISION,
+  distance_km DOUBLE PRECISION,
   notes TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

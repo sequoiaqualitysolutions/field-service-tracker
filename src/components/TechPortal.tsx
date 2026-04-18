@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Square, MapPin, Clock } from 'lucide-react';
 import { Profile, Client, TimeEntry } from '../types';
 import { MapView } from './MapView';
-import { formatTime, formatDuration, calcHours, getCurrentGps } from '../utils/helpers';
+import { formatTime, formatDuration, calcHours, getCurrentGps, calcDistanceKm } from '../utils/helpers';
 import { supabase } from '../lib/supabase';
 
 interface TechPortalProps {
@@ -155,12 +155,19 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
       setGpsStatus('Stop GPS unavailable');
     }
 
+    // Calculate straight-line distance between clock-in and clock-out
+    let distance: number | null = null;
+    if (activeEntry.start_lat != null && activeEntry.start_lng != null && lat != null && lng != null) {
+      distance = calcDistanceKm(activeEntry.start_lat, activeEntry.start_lng, lat, lng);
+    }
+
     const { error } = await supabase
       .from('time_entries')
       .update({
         end_time: new Date().toISOString(),
         stop_lat: lat,
         stop_lng: lng,
+        distance_km: distance,
       })
       .eq('id', activeEntry.id);
 
@@ -276,10 +283,24 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
                         {formatTime(entry.start_time)} → {entry.end_time ? formatTime(entry.end_time) : 'Active'}
                       </p>
                     </div>
-                    <span className="badge badge-sm badge-primary">
-                      {formatDuration(calcHours(entry.start_time, entry.end_time))}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="badge badge-sm badge-primary">
+                        {formatDuration(calcHours(entry.start_time, entry.end_time))}
+                      </span>
+                      {entry.distance_km != null ? (
+                        <span className={`badge badge-xs ${entry.distance_km > 2 ? 'badge-error animate-pulse' : 'badge-success'}`}>
+                          📍 {entry.distance_km.toFixed(2)} km {entry.distance_km > 2 ? '⚠️' : '✓'}
+                        </span>
+                      ) : (entry.start_lat == null || entry.stop_lat == null) && entry.end_time ? (
+                        <span className="badge badge-xs badge-warning">📍 No GPS ⚠️</span>
+                      ) : null}
+                    </div>
                   </div>
+                  {entry.distance_km != null && entry.distance_km > 2 && (
+                    <p className="text-xs text-error mt-1 font-semibold">
+                      ⚠️ Distance flag: Tech moved {entry.distance_km.toFixed(2)} km between clock-in and clock-out
+                    </p>
+                  )}
                   {entry.notes && <p className="text-xs text-base-content/40 mt-1 italic">{entry.notes}</p>}
                 </div>
               ))}
