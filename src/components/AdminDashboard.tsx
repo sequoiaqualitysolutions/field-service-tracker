@@ -7,6 +7,7 @@ import Chart from 'chart.js/auto';
 
 export const AdminDashboard: React.FC = () => {
   const [techs, setTechs] = useState<Profile[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
@@ -24,6 +25,10 @@ export const AdminDashboard: React.FC = () => {
       .in('role', ['tech', 'team_leader'])
       .order('name');
     setTechs((techRows || []) as Profile[]);
+
+    // Count ALL users including admin
+    const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+    setTotalUsers(count || 0);
 
     const startDate = new Date(year, month, 1).toISOString();
     const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
@@ -209,8 +214,8 @@ export const AdminDashboard: React.FC = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="stat bg-base-200 rounded-lg p-3 border border-primary/10">
-          <div className="stat-title text-xs"><Users size={14} className="inline mr-1" />Technicians</div>
-          <div className="stat-value text-xl">{techs.length}</div>
+          <div className="stat-title text-xs"><Users size={14} className="inline mr-1" />Users</div>
+          <div className="stat-value text-xl">{totalUsers}</div>
         </div>
         <div className="stat bg-base-200 rounded-lg p-3 border border-primary/10">
           <div className="stat-title text-xs"><Clock size={14} className="inline mr-1" />Total Hours</div>
