@@ -24,6 +24,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
   const [startCoords, setStartCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [stopCoords, setStopCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showAddTech, setShowAddTech] = useState(false);
+  const [busyTechs, setBusyTechs] = useState<Record<string, string>>({});  // techId -> client name
   const [techDropdownOpen, setTechDropdownOpen] = useState(false);
   const timerRef = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -83,6 +84,17 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
       .neq('id', profile.id)
       .order('name');
     setAllTechs((techData || []) as Profile[]);
+
+    // Find techs currently clocked in (to grey them out)
+    const { data: activeEntries } = await supabase
+      .from('time_entries')
+      .select('tech_id, clients(name)')
+      .is('end_time', null);
+    const busyMap: Record<string, string> = {};
+    (activeEntries || []).forEach((e: any) => {
+      busyMap[e.tech_id] = e.clients?.name || 'another account';
+    });
+    setBusyTechs(busyMap);
 
     // Get active session
     const { data: activeSessions } = await supabase
@@ -182,8 +194,11 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
       return;
     }
 
+    // Filter out techs who are already clocked in elsewhere
+    const availableSelected = selectedTechs.filter(id => !busyTechs[id]);
+
     // Create time entries for leader + all selected techs
-    const allPeople = [profile.id, ...selectedTechs];
+    const allPeople = [profile.id, ...availableSelected];
     const entries = allPeople.map(personId => ({
       tech_id: personId,
       client_id: selectedClient,
@@ -262,6 +277,10 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
 
   async function handleAddTech(techId: string) {
     if (!activeSession) return;
+    // Check if tech is already clocked in
+    if (busyTechs[techId]) {
+      return;
+    }
     setLoading(true);
 
     const now = new Date().toISOString();
@@ -359,7 +378,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
                         <div className="p-2 border-b border-base-content/10 flex gap-2 sticky top-0 bg-base-300 z-10">
                           <button
                             className="btn btn-xs btn-ghost"
-                            onClick={() => setSelectedTechs(allTechs.map(t => t.id))}
+                            onClick={() => setSelectedTechs(allTechs.filter(t => !busyTechs[t.id]).map(t => t.id))}
                           >
                             Select All
                           </button>
@@ -370,25 +389,32 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
                             Clear All
                           </button>
                         </div>
-                        {allTechs.map(tech => (
-                          <label
-                            key={tech.id}
-                            className="flex items-center gap-3 px-3 py-2 hover:bg-base-200 cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              className="checkbox checkbox-sm checkbox-primary"
-                              checked={selectedTechs.includes(tech.id)}
-                              onChange={() => toggleTech(tech.id)}
-                            />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{tech.name}</p>
-                              <p className="text-xs text-base-content/50">
-                                {tech.role === 'team_leader' ? '👑 Team Leader' : '🔧 Technician'} • ${Number(tech.hourly_rate).toFixed(2)}/hr
-                              </p>
-                            </div>
-                          </label>
-                        ))}
+                        {allTechs.map(tech => {
+                          const isBusy = !!busyTechs[tech.id];
+                          return (
+                            <label
+                              key={tech.id}
+                              className={`flex items-center gap-3 px-3 py-2 ${isBusy ? 'opacity-40 cursor-not-allowed' : 'hover:bg-base-200 cursor-pointer'}`}
+                              title={isBusy ? `Currently clocked in at ${busyTechs[tech.id]}` : ''}
+                            >
+                              <input
+                                type="checkbox"
+                                className="checkbox checkbox-sm checkbox-primary"
+                                checked={selectedTechs.includes(tech.id)}
+                                onChange={() => !isBusy && toggleTech(tech.id)}
+                                disabled={isBusy}
+                              />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{tech.name}</p>
+                                <p className="text-xs text-base-content/50">
+                                  {isBusy
+                                    ? `🔴 On clock at ${busyTechs[tech.id]}`
+                                    : `${tech.role === 'team_leader' ? '👑 Team Leader' : '🔧 Technician'} • $${Number(tech.hourly_rate).toFixed(2)}/hr`}
+                                </p>
+                              </div>
+                            </label>
+                          );
+                        })}
                       </>
                     )}
                   </div>
@@ -486,19 +512,23 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile }) =
                     <div className="bg-base-300 rounded-lg p-3 space-y-2">
                       <p className="text-xs font-semibold">Select a technician to add:</p>
                       <div className="max-h-40 overflow-y-auto space-y-1">
-                        {availableTechsToAdd.map(tech => (
-                          <button
-                            key={tech.id}
-                            className="btn btn-sm btn-ghost w-full justify-start"
-                            onClick={() => handleAddTech(tech.id)}
-                            disabled={loading}
-                          >
-                            <Plus size={14} /> {tech.name}
-                            <span className="text-xs text-base-content/50 ml-auto">
-                              {tech.role === 'team_leader' ? 'Leader' : 'Tech'}
-                            </span>
-                          </button>
-                        ))}
+                        {availableTechsToAdd.map(tech => {
+                          const isBusy = !!busyTechs[tech.id];
+                          return (
+                            <button
+                              key={tech.id}
+                              className={`btn btn-sm btn-ghost w-full justify-start ${isBusy ? 'opacity-40' : ''}`}
+                              onClick={() => handleAddTech(tech.id)}
+                              disabled={loading || isBusy}
+                              title={isBusy ? `Currently clocked in at ${busyTechs[tech.id]}` : ''}
+                            >
+                              <Plus size={14} /> {tech.name}
+                              <span className="text-xs text-base-content/50 ml-auto">
+                                {isBusy ? `🔴 On clock` : tech.role === 'team_leader' ? 'Leader' : 'Tech'}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                       <button
                         className="btn btn-xs btn-ghost w-full"

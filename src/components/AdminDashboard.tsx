@@ -12,6 +12,7 @@ export const AdminDashboard: React.FC = () => {
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
   const [selectedTech, setSelectedTech] = useState<string>('all');
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
 
@@ -41,6 +42,14 @@ export const AdminDashboard: React.FC = () => {
       .not('end_time', 'is', null);
 
     setEntries((entryRows || []) as unknown as TimeEntry[]);
+
+    // Active sessions
+    const { data: activeData } = await supabase
+      .from('time_entries')
+      .select('id, tech_id, client_id, start_time, clocked_in_by, session_id, profiles!time_entries_tech_id_fkey(name, role), clients(name)')
+      .is('end_time', null)
+      .order('start_time', { ascending: true });
+    setActiveSessions(activeData || []);
   }
 
   const weeks = getWeeksInMonth(year, month);
@@ -236,6 +245,61 @@ export const AdminDashboard: React.FC = () => {
           <div className={`stat-value text-xl ${gpsAlerts.length > 0 ? 'text-warning' : ''}`}>
             {gpsAlerts.length}
           </div>
+        </div>
+      </div>
+
+      {/* 🟢 Active Sessions - Who's On The Clock */}
+      <div className="card bg-base-200">
+        <div className="card-body p-4">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
+            Active Sessions ({activeSessions.length} on the clock)
+          </h3>
+          {activeSessions.length === 0 ? (
+            <p className="text-sm text-base-content/50 text-center py-4">No one is currently clocked in</p>
+          ) : (
+            <div className="overflow-x-auto mt-2">
+              <table className="table table-xs w-full">
+                <thead>
+                  <tr>
+                    <th>Person</th>
+                    <th>Role</th>
+                    <th>Client</th>
+                    <th>Started</th>
+                    <th>Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeSessions.map((entry: any) => {
+                    const startMs = new Date(entry.start_time).getTime();
+                    const diffMin = Math.floor((Date.now() - startMs) / 60000);
+                    const hours = Math.floor(diffMin / 60);
+                    const mins = diffMin % 60;
+                    const duration = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+                    return (
+                      <tr key={entry.id} className="hover">
+                        <td className="font-medium">{entry.profiles?.name || 'Unknown'}</td>
+                        <td>
+                          <span className="badge badge-xs">
+                            {entry.profiles?.role === 'team_leader' ? '👑 Leader' : '🔧 Tech'}
+                          </span>
+                        </td>
+                        <td>{entry.clients?.name || 'Unknown'}</td>
+                        <td className="text-xs">
+                          {new Date(entry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td>
+                          <span className={`badge badge-sm ${hours >= 8 ? 'badge-error' : 'badge-success'}`}>
+                            {duration}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
