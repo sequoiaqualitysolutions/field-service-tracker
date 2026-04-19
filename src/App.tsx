@@ -88,7 +88,7 @@ export default function App() {
 
   function renderView() {
     switch (currentView) {
-      case 'dashboard': return <AdminDashboard />;
+      case 'dashboard': return profile?.role === 'admin' ? <AdminDashboard /> : <TeamLeaderPortal profile={profile!} onGpsUpdate={setGpsData} />;
       case 'clients': return <ClientManager />;
       case 'pay-report': return profile?.role === 'admin' ? <PayReport /> : <AdminDashboard />;
       case 'user-management': return <UserManager />;
