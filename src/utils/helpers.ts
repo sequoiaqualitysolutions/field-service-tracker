@@ -45,12 +45,36 @@ export function calcDistanceKm(
 
 export function getWeeksInMonth(year: number, month: number) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const weeks = [];
-  let startDay = 1;
+  const weeks: { week: number; startDay: number; endDay: number; label: string }[] = [];
+
+  // First day of the month — what day of week is it? (0=Sun,1=Mon,...,6=Sat)
+  const firstDow = new Date(year, month, 1).getDay();
+
+  // Week 1: starts on the 1st, ends on the first Sunday
+  // If the 1st is already a Sunday (0), week 1 is just day 1
+  // If the 1st is Monday (1), week 1 is days 1-7 (Mon-Sun)
+  let firstSunday: number;
+  if (firstDow === 0) {
+    // 1st is Sunday — week 1 is just that day
+    firstSunday = 1;
+  } else {
+    // Days until Sunday: 7 - firstDow
+    firstSunday = 1 + (7 - firstDow);
+  }
+
   let week = 1;
+  const endOfWeek1 = Math.min(firstSunday, daysInMonth);
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mon = monthNames[month];
+
+  weeks.push({ week, startDay: 1, endDay: endOfWeek1, label: `Wk ${week} (${mon} ${1}-${endOfWeek1})` });
+
+  // Remaining weeks: Monday to Sunday
+  let startDay = endOfWeek1 + 1;
+  week++;
   while (startDay <= daysInMonth) {
     const endDay = Math.min(startDay + 6, daysInMonth);
-    weeks.push({ week, startDay, endDay, label: `Wk ${week} (${startDay}-${endDay})` });
+    weeks.push({ week, startDay, endDay, label: `Wk ${week} (${mon} ${startDay}-${endDay})` });
     startDay = endDay + 1;
     week++;
   }
