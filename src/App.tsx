@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Menu } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { Profile, AppView } from './types';
 import { LoginPage } from './components/LoginPage';
@@ -17,6 +18,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('tech-portal');
   const [preselectedClientId, setPreselectedClientId] = useState<number | null>(null);
   const [gpsData, setGpsData] = useState<{ startCoords: { lat: number; lng: number } | null; stopCoords: { lat: number; lng: number } | null }>({ startCoords: null, stopCoords: null });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     checkSession();
@@ -74,6 +76,11 @@ export default function App() {
     setCurrentView('tech-portal');
   }
 
+  function handleNavigate(view: AppView) {
+    setCurrentView(view);
+    setSidebarOpen(false);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-300">
@@ -99,10 +106,48 @@ export default function App() {
     }
   }
 
+  const roleLabel = profile.role === 'admin' ? 'ADMIN' : profile.role === 'team_leader' ? 'TEAM LEADER' : 'TECH';
+
   return (
     <div className="flex h-screen bg-base-300">
-      <Sidebar profile={profile} currentView={currentView} onNavigate={setCurrentView} gpsData={gpsData} />
-      <div className="flex-1 overflow-auto">
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-base-200 border-b border-base-300 px-3 py-2 flex items-center gap-3">
+        <button className="btn btn-ghost btn-sm btn-square" onClick={() => setSidebarOpen(true)}>
+          <Menu size={22} />
+        </button>
+        <img src="/sqs-logo.svg" alt="SQS" className="h-7 w-7" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-primary truncate">{profile.name}</p>
+          <p className="text-[10px] text-base-content/50">{roleLabel}</p>
+        </div>
+      </div>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-40 transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — always visible on md+, drawer on mobile */}
+      <div className={`
+        fixed md:static inset-y-0 left-0 z-50 md:z-auto
+        transform transition-transform duration-200 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0
+      `}>
+        <Sidebar
+          profile={profile}
+          currentView={currentView}
+          onNavigate={handleNavigate}
+          gpsData={gpsData}
+          onClose={() => setSidebarOpen(false)}
+        />
+      </div>
+
+      {/* Main content — add top padding on mobile for the top bar */}
+      <div className="flex-1 overflow-auto pt-12 md:pt-0">
         {renderView()}
       </div>
     </div>

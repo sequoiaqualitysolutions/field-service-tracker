@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut, CalendarDays, UserCheck } from 'lucide-react';
+import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut, CalendarDays, UserCheck, X } from 'lucide-react';
 import { AppView, Profile } from '../types';
 import { supabase } from '../lib/supabase';
 import { MapView } from './MapView';
@@ -9,9 +9,10 @@ interface SidebarProps {
   currentView: AppView;
   onNavigate: (view: AppView) => void;
   gpsData?: { startCoords: { lat: number; lng: number } | null; stopCoords: { lat: number; lng: number } | null };
+  onClose?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNavigate, gpsData }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNavigate, gpsData, onClose }) => {
   const isAdmin = profile.role === 'admin';
   const isLeader = profile.role === 'team_leader';
   const isTech = profile.role === 'tech';
@@ -52,17 +53,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
     window.location.reload();
   }
 
+  function handleNav(view: AppView) {
+    onNavigate(view);
+    onClose?.();
+  }
+
   return (
-    <div className="w-56 bg-base-200 flex flex-col h-full border-r border-base-300">
+    <div className="w-64 bg-base-200 flex flex-col h-full border-r border-base-300">
       <div className="p-4 border-b border-base-300">
-        <div className="flex items-center gap-2 mb-2">
-          <img src="/sqs-logo.svg" alt="SQS" className="h-8 w-8" />
-          <div>
-            <h2 className="font-bold text-xs text-primary tracking-wide leading-tight">SEQUOIA QUALITY</h2>
-            <h2 className="font-bold text-xs text-primary tracking-wide leading-tight">SOLUTIONS</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src="/sqs-logo.svg" alt="SQS" className="h-8 w-8" />
+            <div>
+              <h2 className="font-bold text-xs text-primary tracking-wide leading-tight">SEQUOIA QUALITY</h2>
+              <h2 className="font-bold text-xs text-primary tracking-wide leading-tight">SOLUTIONS</h2>
+            </div>
           </div>
+          {/* Close button on mobile */}
+          <button className="btn btn-ghost btn-xs md:hidden" onClick={onClose}>
+            <X size={18} />
+          </button>
         </div>
-        <p className="text-xs text-base-content/50 mt-1 truncate">{profile.name}</p>
+        <p className="text-xs text-base-content/50 mt-2 truncate">{profile.name}</p>
         <span className={`badge badge-xs ${roleBadge} mt-1`}>{roleLabel}</span>
       </div>
 
@@ -71,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
           <li key={item.view}>
             <a
               className={currentView === item.view ? 'active font-semibold' : ''}
-              onClick={() => onNavigate(item.view)}
+              onClick={() => handleNav(item.view)}
             >
               {item.icon}
               {item.label}
