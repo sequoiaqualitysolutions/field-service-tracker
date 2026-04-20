@@ -146,9 +146,16 @@ export default function App() {
         />
       </div>
 
-      {/* Main content — add top padding on mobile for the top bar */}
-      <div className="flex-1 overflow-auto pt-12 md:pt-0">
+      {/* Main content — add top padding on mobile for the top bar, bottom padding for footer */}
+      <div className="flex-1 overflow-auto pt-12 md:pt-0 pb-8 md:pb-0">
         {renderView()}
+      </div>
+
+      {/* Mobile copyright footer — always visible */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-base-200 border-t border-base-300 py-1.5 px-3 text-center">
+        <p className="text-[9px] text-base-content/40 leading-tight">
+          © {new Date().getFullYear()} Sequoia Quality Solutions™ · Field Service Time Tracker™
+        </p>
       </div>
     </div>
   );

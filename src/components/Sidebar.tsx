@@ -117,6 +117,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
           <LogOut size={16} /> Sign Out
         </button>
       </div>
+
+      {/* Copyright */}
+      <div className="px-3 py-2 border-t border-base-300 text-center">
+        <p className="text-[9px] text-base-content/40 leading-tight">
+          © {new Date().getFullYear()} Sequoia Quality Solutions™
+        </p>
+        <p className="text-[8px] text-base-content/30 leading-tight">
+          Field Service Time Tracker™
+        </p>
+      </div>
     </div>
   );
 };
