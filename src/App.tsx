@@ -152,10 +152,16 @@ export default function App() {
       </div>
 
       {/* Mobile copyright footer — always visible */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-base-200 border-t border-base-300 py-1.5 px-3 text-center">
-        <p className="text-[9px] text-base-content/40 leading-tight">
-          © {new Date().getFullYear()} Sequoia Quality Solutions™ · Field Service Time Tracker™
-        </p>
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-base-200 border-t-2 border-primary/30 py-2 px-3 flex items-center justify-center gap-2">
+        <img src="/sqs-logo.svg" alt="SQS" className="h-5 w-5" />
+        <div className="text-center">
+          <p className="text-[11px] font-semibold text-primary leading-tight">
+            © {new Date().getFullYear()} Sequoia Quality Solutions™
+          </p>
+          <p className="text-[10px] text-base-content/60 leading-tight">
+            Field Service Time Tracker™
+          </p>
+        </div>
       </div>
     </div>
   );
