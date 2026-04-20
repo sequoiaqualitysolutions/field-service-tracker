@@ -16,7 +16,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [activeSession, setActiveSession] = useState<TeamSession | null>(null);
   const [sessionEntries, setSessionEntries] = useState<TimeEntry[]>([]);
-  const [todayEntries, setTodayEntries] = useState<TimeEntry[]>([]);
+
   const [elapsed, setElapsed] = useState('00:00:00');
   const [notes, setNotes] = useState('');
   const [sessionNotes, setSessionNotes] = useState('');
@@ -138,17 +138,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
       setSessionEntries([]);
     }
 
-    // Get today's completed entries for this leader
-    const today = new Date().toISOString().split('T')[0];
-    const { data: todayRows } = await supabase
-      .from('time_entries')
-      .select('*, clients(name, account_number), profiles!time_entries_tech_id_fkey(name)')
-      .eq('tech_id', profile.id)
-      .not('end_time', 'is', null)
-      .gte('start_time', `${today}T00:00:00`)
-      .lte('start_time', `${today}T23:59:59`)
-      .order('start_time', { ascending: false });
-    setTodayEntries((todayRows || []) as unknown as TimeEntry[]);
+
   }
 
   async function handleStartSession() {
@@ -388,7 +378,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     );
   }
 
-  const todayTotal = todayEntries.reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0);
+
   const techsInSession = sessionEntries.map(e => e.tech_id);
   const availableTechsToAdd = allTechs.filter(t => !techsInSession.includes(t.id));
 
@@ -657,49 +647,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
 
 
 
-      {/* Today's Completed Entries */}
-      <div className="card bg-base-200">
-        <div className="card-body p-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-semibold text-sm">Today&apos;s Completed Sessions</h3>
-            <span className="badge badge-sm">{formatDuration(todayTotal)} your hours</span>
-          </div>
-          {todayEntries.length === 0 ? (
-            <p className="text-sm text-base-content/50 text-center py-4">No completed entries today</p>
-          ) : (
-            <div className="space-y-2">
-              {todayEntries.map(entry => (
-                <div key={entry.id} className="bg-base-300 rounded-lg p-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-sm">{(entry.clients as any)?.name || 'Unknown'}</p>
-                      <p className="text-xs text-base-content/50">
-                        {formatTime(entry.start_time)} → {entry.end_time ? formatTime(entry.end_time) : 'Active'}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="badge badge-sm badge-primary">
-                        {formatDuration(calcHours(entry.start_time, entry.end_time))}
-                      </span>
-                      {entry.distance_km != null ? (
-                        <span className={`badge badge-xs ${entry.distance_km > 1 ? 'badge-error animate-pulse' : 'badge-success'}`}>
-                          📍 {entry.distance_km.toFixed(2)} km {entry.distance_km > 1 ? '⚠️' : '✓'}
-                        </span>
-                      ) : (entry.start_lat == null || entry.stop_lat == null) && entry.end_time ? (
-                        <span className="badge badge-xs badge-warning">📍 No GPS ⚠️</span>
-                      ) : null}
-                      {entry.end_time && calcHours(entry.start_time, entry.end_time) < (10 / 60) && (
-                        <span className="badge badge-xs badge-error animate-pulse">⏱️ &lt;10 min ⚠️</span>
-                      )}
-                    </div>
-                  </div>
-                  {entry.notes && <p className="text-xs text-base-content/40 mt-1 italic">{entry.notes}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+
     </div>
   );
 };
