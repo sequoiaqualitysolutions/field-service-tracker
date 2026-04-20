@@ -383,7 +383,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
   const availableTechsToAdd = allTechs.filter(t => !techsInSession.includes(t.id));
 
   return (
-    <div className="p-4 space-y-4 max-w-2xl mx-auto">
+    <div className="p-4 space-y-4 max-w-5xl mx-auto">
       <h2 className="text-lg font-bold flex items-center gap-2">
         <Users size={22} className="text-primary" />
         {profile.name}&apos;s Team Portal
@@ -391,7 +391,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
 
       {/* Clock In / Active Session Card */}
       <div className={`card ${activeSession ? 'bg-success/10 border border-success/30' : 'bg-base-200'}`}>
-        <div className="card-body p-4 space-y-3">
+        <div className="card-body p-5 sm:p-6 space-y-4">
           {!activeSession ? (
             <>
               {/* Client Select */}
