@@ -77,8 +77,8 @@ export const AdminDashboard: React.FC = () => {
   techs.forEach(t => {
     const weeklyHrs = getWeeklyHours(t.id);
     weeklyHrs.forEach((hrs, i) => {
-      if (hrs > 40) {
-        otAlerts.push({ techName: t.name, week: weeks[i].label, hours: hrs, otHours: hrs - 40 });
+      if (hrs > 45) {
+        otAlerts.push({ techName: t.name, week: weeks[i].label, hours: hrs, otHours: hrs - 45 });
       }
     });
   });
@@ -130,12 +130,12 @@ export const AdminDashboard: React.FC = () => {
         borderWidth: 2,
         tension: 0.3,
         fill: false,
-        pointRadius: weeklyHrs.map(h => h > 40 ? 6 : 4),
-        pointBackgroundColor: weeklyHrs.map(h => h > 40 ? '#ef4444' : colors[i % colors.length]),
+        pointRadius: weeklyHrs.map(h => h > 45 ? 6 : 4),
+        pointBackgroundColor: weeklyHrs.map(h => h > 45 ? '#ef4444' : colors[i % colors.length]),
         segment: {
           borderColor: (ctx: any) => {
             const idx = ctx.p0DataIndex;
-            return weeklyHrs[idx] > 40 || weeklyHrs[idx + 1] > 40 ? '#ef4444' : undefined;
+            return weeklyHrs[idx] > 45 || weeklyHrs[idx + 1] > 45 ? '#ef4444' : undefined;
           },
         },
       };
@@ -155,7 +155,7 @@ export const AdminDashboard: React.FC = () => {
             callbacks: {
               afterLabel: (ctx: any) => {
                 const hrs = ctx.parsed.y;
-                return hrs > 40 ? `⚠️ OVERTIME: ${(hrs - 40).toFixed(1)}h over 40h` : '';
+                return hrs > 45 ? `⚠️ OVERTIME: ${(hrs - 45).toFixed(1)}h over 45h` : '';
               },
             },
           },
@@ -165,13 +165,13 @@ export const AdminDashboard: React.FC = () => {
             min: 0,
             max: maxHrs,
             ticks: {
-              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= 40 ? '#ef4444' : '#e0d6cc',
-              callback: (v: number | string) => Number(v) === 40 ? '40h ⛔' : `${v}h`,
-              font: (ctx: any) => ({ size: 10, family: 'Montserrat', weight: (ctx.tick?.value != null && ctx.tick.value === 40 ? 'bold' : 'normal') as any }),
+              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= 45 ? '#ef4444' : '#e0d6cc',
+              callback: (v: number | string) => Number(v) === 45 ? '45h ⛔' : `${v}h`,
+              font: (ctx: any) => ({ size: 10, family: 'Montserrat', weight: (ctx.tick?.value != null && ctx.tick.value === 45 ? 'bold' : 'normal') as any }),
             },
             grid: {
-              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 40 ? '#ef4444' : '#1a1f26',
-              lineWidth: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 40 ? 2 : 1,
+              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 45 ? '#ef4444' : '#1a1f26',
+              lineWidth: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 45 ? 2 : 1,
             },
           },
           x: {
@@ -291,7 +291,7 @@ export const AdminDashboard: React.FC = () => {
                           {new Date(entry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td>
-                          <span className={`badge badge-sm ${hours >= 8 ? 'badge-error' : 'badge-success'}`}>
+                          <span className={`badge badge-sm ${hours >= 9 ? 'badge-error' : 'badge-success'}`}>
                             {duration}
                           </span>
                         </td>
@@ -312,7 +312,7 @@ export const AdminDashboard: React.FC = () => {
           <div style={{ height: '320px' }}>
             <canvas ref={chartRef} />
           </div>
-          <p className="text-xs text-base-content/40 mt-2">Red dashed line = 40h/week threshold. Points turn red when over.</p>
+          <p className="text-xs text-base-content/40 mt-2">Red dashed line = 45h/week threshold. Points turn red when over.</p>
         </div>
       </div>
 
@@ -384,7 +384,7 @@ export const AdminDashboard: React.FC = () => {
         {techs.map((t, idx) => {
           const totalHrs = getTotalHours(t.id);
           const weeklyHrs = getWeeklyHours(t.id);
-          const hasOt = weeklyHrs.some(h => h > 40);
+          const hasOt = weeklyHrs.some(h => h > 45);
           return (
             <div key={t.id} className={`card ${hasOt ? 'bg-error/10 border-2 border-error/40' : 'bg-base-200 border border-primary/10'}`}>
               <div className="card-body p-4">
@@ -405,9 +405,9 @@ export const AdminDashboard: React.FC = () => {
                     {weeklyHrs.map((h, wi) => (
                       <span
                         key={wi}
-                        className={`badge badge-xs ${h > 40 ? 'badge-error' : h > 0 ? 'badge-primary' : 'badge-ghost'}`}
+                        className={`badge badge-xs ${h > 45 ? 'badge-error' : h > 0 ? 'badge-primary' : 'badge-ghost'}`}
                       >
-                        W{wi + 1}: {h.toFixed(1)}h {h > 40 ? '🔥' : ''}
+                        W{wi + 1}: {h.toFixed(1)}h {h > 45 ? '🔥' : ''}
                       </span>
                     ))}
                   </div>

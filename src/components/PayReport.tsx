@@ -52,8 +52,8 @@ export const PayReport: React.FC = () => {
     let regularHours = 0;
     let overtimeHours = 0;
     weeklyHours.forEach(h => {
-      if (h <= 40) { regularHours += h; }
-      else { regularHours += 40; overtimeHours += h - 40; }
+      if (h <= 45) { regularHours += h; }
+      else { regularHours += 45; overtimeHours += h - 45; }
     });
 
     const gpsFlags = techEntries.filter(e =>
@@ -208,8 +208,8 @@ export const PayReport: React.FC = () => {
                   </thead>
                   <tbody>
                     {d.weeklyHours.map((h, i) => {
-                      const reg = Math.min(h, 40);
-                      const ot = Math.max(0, h - 40);
+                      const reg = Math.min(h, 45);
+                      const ot = Math.max(0, h - 45);
                       return (
                         <tr key={i} className={ot > 0 ? 'text-error' : ''}>
                           <td>{weeks[i].label}</td>
