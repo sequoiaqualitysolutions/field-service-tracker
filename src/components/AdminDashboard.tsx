@@ -164,6 +164,14 @@ export const AdminDashboard: React.FC = () => {
           y: {
             min: 0,
             max: maxHrs,
+            afterBuildTicks: (axis: any) => {
+              const ticks = axis.ticks || [];
+              if (!ticks.find((t: any) => t.value === 45)) {
+                ticks.push({ value: 45 });
+                ticks.sort((a: any, b: any) => a.value - b.value);
+              }
+              axis.ticks = ticks;
+            },
             ticks: {
               color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= 45 ? '#ef4444' : '#e0d6cc',
               callback: (v: number | string) => Number(v) === 45 ? '45h ⛔' : `${v}h`,
