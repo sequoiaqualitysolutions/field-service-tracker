@@ -171,25 +171,46 @@ export default async (req: Request, _context: Context) => {
     });
   }
 
-  /* --- Look up this user's iCal URL --- */
+  /* --- Determine which user's calendar to load --- */
+  const url = new URL(req.url);
+  const requestedUserId = url.searchParams.get('userId');
+  let targetUserId = user.id;
+
+  // If admin requests another user's calendar, allow it
+  if (requestedUserId && requestedUserId !== user.id) {
+    const { data: callerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (callerProfile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Only admins can view other calendars' }), {
+        status: 403,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+    targetUserId = requestedUserId;
+  }
+
+  /* --- Look up target user's iCal URL --- */
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('google_calendar_id')
-    .eq('id', user.id)
+    .eq('id', targetUserId)
     .single();
 
   if (!profile?.google_calendar_id) {
     return new Response(
       JSON.stringify({
         events: [],
-        message: 'No Google Calendar linked to your profile.',
+        message: 'No Google Calendar linked to this profile.',
       }),
       { headers: { ...cors, 'Content-Type': 'application/json' } },
     );
   }
 
   /* --- Build date range from query params --- */
-  const url = new URL(req.url);
   const timeMin = new Date(
     url.searchParams.get('timeMin') ||
     new Date(new Date().setHours(0, 0, 0, 0)).toISOString()

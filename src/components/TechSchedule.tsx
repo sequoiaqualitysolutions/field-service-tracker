@@ -156,6 +156,23 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
   const timerRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
 
+  /* --- Admin: user selector --- */
+  const isAdmin = profile.role === 'admin';
+  const [allUsers, setAllUsers] = useState<{ id: string; name: string; role: string; google_calendar_id: string | null }[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>(profile.id);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name, role, google_calendar_id')
+        .in('role', ['tech', 'team_leader', 'admin'])
+        .order('name');
+      if (data) setAllUsers(data);
+    })();
+  }, [isAdmin]);
+
   /* ---------- Fetch calendar events ---------- */
   const fetchEvents = useCallback(
     async (quiet = false) => {
@@ -164,11 +181,12 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
       setMessage('');
 
       try {
-        // Fetch assigned clients
+        // Fetch assigned clients (for selected user if admin)
+        const targetUserId = isAdmin ? selectedUserId : profile.id;
         const { data: assignments } = await supabase
           .from('client_assignments')
           .select('client_id, clients(*)')
-          .eq('tech_id', profile.id);
+          .eq('tech_id', targetUserId);
 
         const assignedClients = (assignments || [])
           .map((a: any) => a.clients)
@@ -196,22 +214,26 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
           return;
         }
 
-        // Check if user has a Google Calendar ID configured
-        if (!profile.google_calendar_id) {
-          setMessage('Google Calendar is not configured yet. Your admin will set this up — use the Clock In page for now.');
+        // Check if target user has a Google Calendar ID configured
+        const targetCalendarId = isAdmin
+          ? allUsers.find(u => u.id === targetUserId)?.google_calendar_id
+          : profile.google_calendar_id;
+
+        if (!targetCalendarId) {
+          setMessage(isAdmin
+            ? 'No Google Calendar configured for this user. Add their iCal URL in User Manager.'
+            : 'Google Calendar is not configured yet. Your admin will set this up — use the Clock In page for now.');
           setEvents([]);
           setLoading(false);
           return;
         }
 
-        const res = await fetch(
-          `/api/google-calendar?timeMin=${encodeURIComponent(
-            timeMin,
-          )}&timeMax=${encodeURIComponent(timeMax)}`,
-          {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          },
-        );
+        const calUrl = `/api/google-calendar?timeMin=${encodeURIComponent(
+          timeMin,
+        )}&timeMax=${encodeURIComponent(timeMax)}${isAdmin && targetUserId !== profile.id ? `&userId=${targetUserId}` : ''}`;
+        const res = await fetch(calUrl, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
 
         if (!res.ok) {
           setMessage('Google Calendar is not available yet. Your admin will set this up — use the Clock In page for now.');
@@ -253,7 +275,7 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
       }
       setLoading(false);
     },
-    [profile.id, view, weekStart],
+    [profile.id, view, weekStart, isAdmin, selectedUserId, allUsers],
   );
 
   /* ---------- Auto-refresh every 15 min ---------- */
@@ -395,8 +417,22 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-lg font-bold flex items-center gap-2">
-          <CalendarDays size={22} className="text-primary" /> My Schedule
+          <CalendarDays size={22} className="text-primary" /> {isAdmin ? 'Schedule' : 'My Schedule'}
         </h2>
+        {isAdmin && allUsers.length > 0 && (
+          <select
+            className="select select-bordered select-sm font-semibold"
+            value={selectedUserId}
+            onChange={e => setSelectedUserId(e.target.value)}
+          >
+            {allUsers.map(u => (
+              <option key={u.id} value={u.id}>
+                {u.name} ({u.role === 'team_leader' ? 'TL' : u.role === 'admin' ? 'Admin' : 'Tech'})
+                {u.google_calendar_id ? '' : ' — no calendar'}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="flex items-center gap-2">
           {/* Sync status */}
           <div className="flex items-center gap-1 text-xs text-base-content/50">
