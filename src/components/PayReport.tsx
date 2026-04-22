@@ -25,7 +25,7 @@ export const PayReport: React.FC = () => {
 
     const { data: entryRows } = await supabase
       .from('time_entries')
-      .select('*, clients(name, account_number), profiles!time_entries_tech_id_fkey(name)')
+      .select('*, clients(name, account_number, service_type), profiles!time_entries_tech_id_fkey(name)')
       .gte('start_time', startDate)
       .lte('start_time', endDate)
       .not('end_time', 'is', null)
@@ -82,11 +82,13 @@ export const PayReport: React.FC = () => {
     });
 
     // Detailed entries with notes
-    const detailHeaders = ['Technician', 'Client', 'Account #', 'Date', 'Clock In', 'Clock Out', 'Hours', 'Notes', 'GPS Missing', 'Distance > 1km', 'Short Visit'];
+    const detailHeaders = ['Technician', 'Client', 'Activity', 'Account #', 'Date', 'Clock In', 'Clock Out', 'Hours', 'Notes', 'GPS Missing', 'Distance > 1km', 'Short Visit'];
     const detailRows = entries.map(e => {
       const techName = (e.profiles as any)?.name || 'Unknown';
-      const clientName = (e.clients as any)?.name || 'Unknown';
-      const acctNum = (e.clients as any)?.account_number || '';
+      const isInternal = (e.clients as any)?.service_type === 'INTERNAL';
+      const clientName = isInternal ? '' : ((e.clients as any)?.name || 'Unknown');
+      const activityName = isInternal ? ((e.clients as any)?.name || '').replace(/[📋🔧🚗📚]\s*/g, '') : '';
+      const acctNum = isInternal ? '' : ((e.clients as any)?.account_number || '');
       const date = new Date(e.start_time).toLocaleDateString();
       const clockIn = new Date(e.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const clockOut = e.end_time ? new Date(e.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
@@ -96,7 +98,7 @@ export const PayReport: React.FC = () => {
       const distFlag = (e.distance_km != null && e.distance_km > 1) ? `YES (${e.distance_km.toFixed(2)}km)` : '';
       const durMin = e.end_time ? (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000 : 999;
       const shortFlag = durMin < 10 ? `YES (${Math.round(durMin)}min)` : '';
-      return [techName, clientName, acctNum, date, clockIn, clockOut, hrs, notes, gpsMissing, distFlag, shortFlag];
+      return [techName, clientName, activityName, acctNum, date, clockIn, clockOut, hrs, notes, gpsMissing, distFlag, shortFlag];
     });
 
     const csv = '--- SUMMARY ---\n' + [summaryHeaders, ...summaryRows].map(r => r.join(',')).join('\n') +
@@ -245,6 +247,7 @@ export const PayReport: React.FC = () => {
                         <tr>
                           <th>Date</th>
                           <th>Client</th>
+                          <th>Activity</th>
                           <th>In</th>
                           <th>Out</th>
                           <th>Hours</th>
@@ -263,7 +266,8 @@ export const PayReport: React.FC = () => {
                           return (
                             <tr key={entry.id}>
                               <td className="whitespace-nowrap">{new Date(entry.start_time).toLocaleDateString()}</td>
-                              <td>{(entry.clients as any)?.name || '—'}</td>
+                              <td>{(entry.clients as any)?.service_type === 'INTERNAL' ? '—' : ((entry.clients as any)?.name || '—')}</td>
+                              <td className="text-amber-500 font-medium">{(entry.clients as any)?.service_type === 'INTERNAL' ? ((entry.clients as any)?.name || '').replace(/[📋🔧🚗📚]\s*/g, '') : '—'}</td>
                               <td className="whitespace-nowrap">{new Date(entry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                               <td className="whitespace-nowrap">{entry.end_time ? new Date(entry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                               <td>{hrs.toFixed(1)}h</td>
