@@ -36,7 +36,7 @@ export const AdminDashboard: React.FC = () => {
 
     const { data: entryRows } = await supabase
       .from('time_entries')
-      .select('*, clients(name, account_number), profiles!time_entries_tech_id_fkey(name)')
+      .select('*, clients(name, account_number, service_type), profiles!time_entries_tech_id_fkey(name)')
       .gte('start_time', startDate)
       .lte('start_time', endDate)
       .not('end_time', 'is', null);
@@ -89,6 +89,8 @@ export const AdminDashboard: React.FC = () => {
   // GPS distance analysis
   const gpsAlerts: { techName: string; clientName: string; date: string; reason: string; distance?: number }[] = [];
   entries.forEach(e => {
+    // Skip flags for internal time activities (Travel, Office/Admin, etc.)
+    if ((e.clients as any)?.service_type === 'INTERNAL') return;
     const techName = (e.profiles as any)?.name || 'Unknown';
     const clientName = (e.clients as any)?.name || 'Unknown';
     const date = new Date(e.start_time).toLocaleDateString();

@@ -89,7 +89,7 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
     // Get active entry
     const { data: activeRows } = await supabase
       .from('time_entries')
-      .select('*, clients(name, account_number)')
+      .select('*, clients(name, account_number, service_type)')
       .eq('tech_id', profile.id)
       .is('end_time', null)
       .limit(1);
@@ -108,7 +108,7 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
     const today = new Date().toISOString().split('T')[0];
     const { data: todayRows } = await supabase
       .from('time_entries')
-      .select('*, clients(name, account_number)')
+      .select('*, clients(name, account_number, service_type)')
       .eq('tech_id', profile.id)
       .not('end_time', 'is', null)
       .gte('start_time', `${today}T00:00:00`)
@@ -364,24 +364,28 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
                       <span className="badge badge-sm badge-primary">
                         {formatDuration(calcHours(entry.start_time, entry.end_time))}
                       </span>
-                      {entry.distance_km != null ? (
-                        <span className={`badge badge-xs ${entry.distance_km > 1 ? 'badge-error animate-pulse' : 'badge-success'}`}>
-                          📍 {entry.distance_km.toFixed(2)} km {entry.distance_km > 1 ? '⚠️' : '✓'}
-                        </span>
-                      ) : (entry.start_lat == null || entry.stop_lat == null) && entry.end_time ? (
-                        <span className="badge badge-xs badge-warning">📍 No GPS ⚠️</span>
-                      ) : null}
-                      {entry.end_time && calcHours(entry.start_time, entry.end_time) < (10 / 60) && (
-                        <span className="badge badge-xs badge-error animate-pulse">⏱️ &lt;10 min ⚠️</span>
+                      {(entry.clients as any)?.service_type !== 'INTERNAL' && (
+                        <>
+                          {entry.distance_km != null ? (
+                            <span className={`badge badge-xs ${entry.distance_km > 1 ? 'badge-error animate-pulse' : 'badge-success'}`}>
+                              📍 {entry.distance_km.toFixed(2)} km {entry.distance_km > 1 ? '⚠️' : '✓'}
+                            </span>
+                          ) : (entry.start_lat == null || entry.stop_lat == null) && entry.end_time ? (
+                            <span className="badge badge-xs badge-warning">📍 No GPS ⚠️</span>
+                          ) : null}
+                          {entry.end_time && calcHours(entry.start_time, entry.end_time) < (10 / 60) && (
+                            <span className="badge badge-xs badge-error animate-pulse">⏱️ &lt;10 min ⚠️</span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
-                  {entry.distance_km != null && entry.distance_km > 1 && (
+                  {(entry.clients as any)?.service_type !== 'INTERNAL' && entry.distance_km != null && entry.distance_km > 1 && (
                     <p className="text-xs text-error mt-1 font-semibold">
                       ⚠️ Distance flag: Tech moved {entry.distance_km.toFixed(2)} km between clock-in and clock-out
                     </p>
                   )}
-                  {entry.end_time && calcHours(entry.start_time, entry.end_time) < (10 / 60) && (
+                  {(entry.clients as any)?.service_type !== 'INTERNAL' && entry.end_time && calcHours(entry.start_time, entry.end_time) < (10 / 60) && (
                     <p className="text-xs text-error mt-1 font-semibold">
                       ⏱️ Short visit flag: Less than 10 minutes on site
                     </p>

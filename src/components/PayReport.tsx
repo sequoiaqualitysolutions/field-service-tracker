@@ -94,10 +94,10 @@ export const PayReport: React.FC = () => {
       const clockOut = e.end_time ? new Date(e.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const hrs = calcHours(e.start_time, e.end_time).toFixed(2);
       const notes = (e.notes || '').replace(/,/g, ';').replace(/\n/g, ' ');
-      const gpsMissing = (e.start_lat == null || e.stop_lat == null) ? 'YES' : '';
-      const distFlag = (e.distance_km != null && e.distance_km > 1) ? `YES (${e.distance_km.toFixed(2)}km)` : '';
+      const gpsMissing = isInternal ? '' : ((e.start_lat == null || e.stop_lat == null) ? 'YES' : '');
+      const distFlag = isInternal ? '' : ((e.distance_km != null && e.distance_km > 1) ? `YES (${e.distance_km.toFixed(2)}km)` : '');
       const durMin = e.end_time ? (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000 : 999;
-      const shortFlag = durMin < 10 ? `YES (${Math.round(durMin)}min)` : '';
+      const shortFlag = isInternal ? '' : (durMin < 10 ? `YES (${Math.round(durMin)}min)` : '');
       return [techName, clientName, activityName, acctNum, date, clockIn, clockOut, hrs, notes, gpsMissing, distFlag, shortFlag];
     });
 
@@ -260,8 +260,9 @@ export const PayReport: React.FC = () => {
                           const hrs = calcHours(entry.start_time, entry.end_time);
                           const durMin = entry.end_time ? (new Date(entry.end_time).getTime() - new Date(entry.start_time).getTime()) / 60000 : 999;
                           const flags: string[] = [];
-                          if (entry.start_lat == null || entry.stop_lat == null) flags.push('🟡 No GPS');
-                          if (entry.distance_km != null && entry.distance_km > 1) flags.push(`🔴 ${entry.distance_km.toFixed(1)}km`);
+                          const isEntryInternal = (entry.clients as any)?.service_type === 'INTERNAL';
+                          if (!isEntryInternal && (entry.start_lat == null || entry.stop_lat == null)) flags.push('🟡 No GPS');
+                          if (!isEntryInternal && entry.distance_km != null && entry.distance_km > 1) flags.push(`🔴 ${entry.distance_km.toFixed(1)}km`);
                           if (durMin < 10) flags.push(`⏱️ ${Math.round(durMin)}min`);
                           return (
                             <tr key={entry.id}>
