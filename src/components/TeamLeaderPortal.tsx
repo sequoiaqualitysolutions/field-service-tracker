@@ -85,7 +85,12 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     const assignedClients = (assignments || [])
       .map((a: any) => a.clients)
       .filter(Boolean)
-      .sort((a: Client, b: Client) => a.name.localeCompare(b.name));
+      .sort((a: Client, b: Client) => {
+        const aInternal = a.service_type === 'INTERNAL' ? 0 : 1;
+        const bInternal = b.service_type === 'INTERNAL' ? 0 : 1;
+        if (aInternal !== bInternal) return aInternal - bInternal;
+        return a.name.localeCompare(b.name);
+      });
     setClients(assignedClients);
 
     // Get all non-admin users excluding self for multi-select
@@ -401,9 +406,20 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
                 onChange={e => setSelectedClient(Number(e.target.value))}
               >
                 <option value={0}>Select an assigned client...</option>
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.account_number})</option>
-                ))}
+                {clients.filter(c => c.service_type === 'INTERNAL').length > 0 && (
+                  <optgroup label="⏱️ Time Activities">
+                    {clients.filter(c => c.service_type === 'INTERNAL').map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {clients.filter(c => c.service_type !== 'INTERNAL').length > 0 && (
+                  <optgroup label="📍 Client Accounts">
+                    {clients.filter(c => c.service_type !== 'INTERNAL').map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.account_number})</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               {clients.length === 0 && (
                 <p className="text-xs text-warning">No clients assigned to you yet. Contact your admin.</p>
