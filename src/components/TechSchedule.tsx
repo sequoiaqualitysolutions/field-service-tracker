@@ -169,7 +169,12 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
         .select('id, name, role, google_calendar_id')
         .in('role', ['tech', 'team_leader', 'admin'])
         .order('name');
-      if (data) setAllUsers(data);
+      if (data) {
+        setAllUsers(data);
+        // Auto-select first user with a calendar configured
+        const firstWithCal = data.find(u => u.google_calendar_id);
+        if (firstWithCal) setSelectedUserId(firstWithCal.id);
+      }
     })();
   }, [isAdmin]);
 
