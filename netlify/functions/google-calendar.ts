@@ -1,6 +1,5 @@
 import type { Context } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { createSign } from 'crypto';
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL!,
@@ -13,48 +12,129 @@ const cors = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 };
 
-/* ---------- Google Service-Account JWT auth (no extra npm deps) ---------- */
+/* ---------- Simple iCal parser ---------- */
 
-function base64url(input: string): string {
-  return Buffer.from(input).toString('base64url');
+interface ICalEvent {
+  id: string;
+  summary: string;
+  description: string;
+  location: string;
+  start: string;
+  end: string;
+  allDay: boolean;
 }
 
-function createGoogleJWT(clientEmail: string, privateKey: string): string {
-  const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const now = Math.floor(Date.now() / 1000);
-  const payload = base64url(JSON.stringify({
-    iss: clientEmail,
-    scope: 'https://www.googleapis.com/auth/calendar.readonly',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  }));
-
-  const signInput = `${header}.${payload}`;
-  const signer = createSign('RSA-SHA256');
-  signer.update(signInput);
-  const signature = signer.sign(privateKey, 'base64url');
-
-  return `${signInput}.${signature}`;
+function unfoldIcal(raw: string): string {
+  // iCal line folding: lines starting with space/tab are continuations
+  return raw.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
 }
 
-async function getGoogleAccessToken(
-  clientEmail: string,
-  privateKey: string,
-): Promise<string> {
-  const jwt = createGoogleJWT(clientEmail, privateKey);
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=${encodeURIComponent(
-      'urn:ietf:params:oauth:grant-type:jwt-bearer',
-    )}&assertion=${encodeURIComponent(jwt)}`,
-  });
-  const data: any = await res.json();
-  if (!data.access_token) {
-    throw new Error(`Google auth failed: ${JSON.stringify(data)}`);
+function parseIcalDate(value: string): { iso: string; allDay: boolean } {
+  // Handle TZID format: DTSTART;TZID=Africa/Johannesburg:20260422T080000
+  const colonIdx = value.lastIndexOf(':');
+  const dateStr = colonIdx >= 0 ? value.substring(colonIdx + 1) : value;
+  const cleanDate = dateStr.trim();
+
+  // All-day: 20260422
+  if (/^\d{8}$/.test(cleanDate)) {
+    const y = cleanDate.slice(0, 4);
+    const m = cleanDate.slice(4, 6);
+    const d = cleanDate.slice(6, 8);
+    return { iso: `${y}-${m}-${d}`, allDay: true };
   }
-  return data.access_token as string;
+
+  // DateTime: 20260422T080000Z or 20260422T080000
+  if (/^\d{8}T\d{6}Z?$/.test(cleanDate)) {
+    const y = cleanDate.slice(0, 4);
+    const m = cleanDate.slice(4, 6);
+    const d = cleanDate.slice(6, 8);
+    const hh = cleanDate.slice(9, 11);
+    const mm = cleanDate.slice(11, 13);
+    const ss = cleanDate.slice(13, 15);
+    const isUTC = cleanDate.endsWith('Z');
+    return {
+      iso: `${y}-${m}-${d}T${hh}:${mm}:${ss}${isUTC ? 'Z' : ''}`,
+      allDay: false,
+    };
+  }
+
+  return { iso: cleanDate, allDay: false };
+}
+
+function parseIcal(icsText: string, timeMin: Date, timeMax: Date): ICalEvent[] {
+  const unfolded = unfoldIcal(icsText);
+  const lines = unfolded.split(/\r?\n/);
+  const events: ICalEvent[] = [];
+  let inEvent = false;
+  let current: Partial<ICalEvent> & { startDate?: Date; endDate?: Date } = {};
+  let counter = 0;
+
+  for (const line of lines) {
+    if (line === 'BEGIN:VEVENT') {
+      inEvent = true;
+      current = {};
+      continue;
+    }
+    if (line === 'END:VEVENT') {
+      inEvent = false;
+      // Filter by date range
+      if (current.startDate && current.endDate) {
+        if (current.startDate < timeMax && current.endDate > timeMin) {
+          events.push({
+            id: current.id || `ical-${counter++}`,
+            summary: current.summary || 'Untitled Event',
+            description: current.description || '',
+            location: current.location || '',
+            start: current.start || '',
+            end: current.end || '',
+            allDay: current.allDay || false,
+          });
+        }
+      }
+      continue;
+    }
+    if (!inEvent) continue;
+
+    // Parse property:value (handle properties with params like DTSTART;TZID=...:value)
+    const firstColon = line.indexOf(':');
+    if (firstColon < 0) continue;
+    const propFull = line.substring(0, firstColon);
+    const value = line.substring(firstColon + 1);
+    const prop = propFull.split(';')[0].toUpperCase();
+
+    switch (prop) {
+      case 'UID':
+        current.id = value;
+        break;
+      case 'SUMMARY':
+        current.summary = value.replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\\\/g, '\\');
+        break;
+      case 'DESCRIPTION':
+        current.description = value.replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\\\/g, '\\');
+        break;
+      case 'LOCATION':
+        current.location = value.replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\\\/g, '\\');
+        break;
+      case 'DTSTART': {
+        // Full line including params for date parsing
+        const parsed = parseIcalDate(line.substring(prop.length));
+        current.start = parsed.iso;
+        current.allDay = parsed.allDay;
+        current.startDate = new Date(parsed.iso);
+        break;
+      }
+      case 'DTEND': {
+        const parsed = parseIcalDate(line.substring(prop.length));
+        current.end = parsed.iso;
+        current.endDate = new Date(parsed.iso);
+        break;
+      }
+    }
+  }
+
+  // Sort by start time
+  events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  return events;
 }
 
 /* ---------- Handler ---------- */
@@ -91,7 +171,7 @@ export default async (req: Request, _context: Context) => {
     });
   }
 
-  /* --- Look up this user's Google Calendar ID --- */
+  /* --- Look up this user's iCal URL --- */
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('google_calendar_id')
@@ -108,76 +188,39 @@ export default async (req: Request, _context: Context) => {
     );
   }
 
-  /* --- Parse the service-account credentials --- */
-  const saBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64;
-  if (!saBase64) {
-    return new Response(
-      JSON.stringify({
-        events: [],
-        message: 'Google Calendar integration is not configured on the server.',
-      }),
-      { headers: { ...cors, 'Content-Type': 'application/json' } },
-    );
-  }
-
-  let serviceAccount: { client_email: string; private_key: string };
-  try {
-    serviceAccount = JSON.parse(
-      Buffer.from(saBase64, 'base64').toString('utf-8'),
-    );
-  } catch {
-    return new Response(
-      JSON.stringify({ events: [], error: 'Invalid service account config.' }),
-      {
-        status: 500,
-        headers: { ...cors, 'Content-Type': 'application/json' },
-      },
-    );
-  }
-
   /* --- Build date range from query params --- */
   const url = new URL(req.url);
-  const timeMin =
+  const timeMin = new Date(
     url.searchParams.get('timeMin') ||
-    new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
-  const timeMax =
+    new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+  );
+  const timeMax = new Date(
     url.searchParams.get('timeMax') ||
-    new Date(Date.now() + 7 * 86400000).toISOString();
+    new Date(Date.now() + 7 * 86400000).toISOString()
+  );
 
-  /* --- Call Google Calendar API --- */
+  /* --- Fetch and parse iCal feed --- */
   try {
-    const accessToken = await getGoogleAccessToken(
-      serviceAccount.client_email,
-      serviceAccount.private_key,
-    );
+    const icalUrl = profile.google_calendar_id;
 
-    const calUrl =
-      `https://www.googleapis.com/calendar/v3/calendars/` +
-      `${encodeURIComponent(profile.google_calendar_id)}/events` +
-      `?timeMin=${encodeURIComponent(timeMin)}` +
-      `&timeMax=${encodeURIComponent(timeMax)}` +
-      `&singleEvents=true&orderBy=startTime&maxResults=250`;
-
-    const calRes = await fetch(calUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!calRes.ok) {
-      const errText = await calRes.text();
-      throw new Error(`Calendar API ${calRes.status}: ${errText}`);
+    // Validate it looks like an iCal URL
+    if (!icalUrl.includes('.ics') && !icalUrl.includes('calendar.google.com')) {
+      return new Response(
+        JSON.stringify({
+          events: [],
+          message: 'Calendar URL is not a valid iCal feed. Please update your profile with a secret iCal URL.',
+        }),
+        { headers: { ...cors, 'Content-Type': 'application/json' } },
+      );
     }
 
-    const calData: any = await calRes.json();
+    const icalRes = await fetch(icalUrl);
+    if (!icalRes.ok) {
+      throw new Error(`Failed to fetch calendar feed: ${icalRes.status}`);
+    }
 
-    const events = (calData.items || []).map((item: any) => ({
-      id: item.id,
-      summary: item.summary || 'Untitled Event',
-      description: item.description || '',
-      location: item.location || '',
-      start: item.start?.dateTime || item.start?.date || '',
-      end: item.end?.dateTime || item.end?.date || '',
-      allDay: !item.start?.dateTime,
-    }));
+    const icsText = await icalRes.text();
+    const events = parseIcal(icsText, timeMin, timeMax);
 
     return new Response(JSON.stringify({ events }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
