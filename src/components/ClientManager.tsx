@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { Plus, Search, Edit, Trash2, Building2, X, UserCheck, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { Client, Profile } from '../types';
 import { supabase } from '../lib/supabase';
@@ -21,22 +22,21 @@ interface ImportResult {
   error?: string;
 }
 
-function parseCsv(text: string): CsvRow[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, ''));
-  return lines.slice(1).map(line => {
-    const vals = line.match(/(".*?"|[^,]*)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || [];
-    const row: Record<string, string> = {};
-    headers.forEach((h, i) => { row[h] = vals[i] || ''; });
+function parseSpreadsheet(data: ArrayBuffer): CsvRow[] {
+  const wb = XLSX.read(data, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
+  return raw.map(row => {
+    const r: Record<string, string> = {};
+    Object.entries(row).forEach(([k, v]) => { r[k.trim().toLowerCase().replace(/[^a-z_]/g, '')] = String(v).trim(); });
     return {
-      account_number: row['account_number'] || row['accountnumber'] || row['account'] || row['acct'] || '',
-      name: row['name'] || row['company'] || row['company_name'] || row['client_name'] || '',
-      address: row['address'] || row['location'] || '',
-      contact_name: row['contact_name'] || row['contact'] || row['contactname'] || '',
-      contact_phone: row['contact_phone'] || row['phone'] || row['contactphone'] || '',
-      service_type: row['service_type'] || row['service'] || row['servicetype'] || row['type'] || '',
-      notes: row['notes'] || row['note'] || '',
+      account_number: r['account_number'] || r['accountnumber'] || r['account'] || r['acct'] || '',
+      name: r['name'] || r['company'] || r['company_name'] || r['companyname'] || r['client_name'] || r['clientname'] || '',
+      address: r['address'] || r['location'] || '',
+      contact_name: r['contact_name'] || r['contact'] || r['contactname'] || '',
+      contact_phone: r['contact_phone'] || r['phone'] || r['contactphone'] || '',
+      service_type: r['service_type'] || r['service'] || r['servicetype'] || r['type'] || '',
+      notes: r['notes'] || r['note'] || '',
     };
   }).filter(r => r.name && r.account_number);
 }
@@ -156,12 +156,12 @@ export const ClientManager: React.FC = () => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const rows = parseCsv(text);
+      const data = ev.target?.result as ArrayBuffer;
+      const rows = parseSpreadsheet(data);
       setCsvRows(rows);
-      setError(rows.length === 0 ? 'No valid rows found. Check your CSV format.' : '');
+      setError(rows.length === 0 ? 'No valid rows found. Check your spreadsheet format.' : '');
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   }
 
   async function handleBulkImport() {
@@ -200,12 +200,20 @@ export const ClientManager: React.FC = () => {
   }
 
   function downloadTemplate() {
-    const csv = 'account_number,name,address,contact_name,contact_phone,service_type,notes\nACC-1001,Acme Corp,123 Main St,John Smith,555-0101,HVAC,Monthly maintenance\nACC-1002,Beta Industries,456 Oak Ave,Jane Doe,555-0102,Plumbing,Quarterly inspection';
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const wb = XLSX.utils.book_new();
+    const data = [
+      { account_number: 'ACC-1001', name: 'Acme Corp', address: '123 Main St', contact_name: 'John Smith', contact_phone: '555-0101', service_type: 'HVAC', notes: 'Monthly maintenance' },
+      { account_number: 'ACC-1002', name: 'Beta Industries', address: '456 Oak Ave', contact_name: 'Jane Doe', contact_phone: '555-0102', service_type: 'Plumbing', notes: 'Quarterly inspection' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Clients');
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'clients-template.csv';
+    a.download = 'clients-template.xlsx';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -224,7 +232,7 @@ export const ClientManager: React.FC = () => {
         </h2>
         <div className="flex gap-2">
           <button className="btn btn-outline btn-sm" onClick={openCsvUpload}>
-            <Upload size={16} /> Bulk CSV Upload
+            <Upload size={16} /> Bulk Upload (Google Sheets)
           </button>
           <button className="btn btn-primary btn-sm" onClick={openAdd}>
             <Plus size={16} /> Add Client
@@ -367,7 +375,7 @@ export const ClientManager: React.FC = () => {
         </div>
       )}
 
-      {/* CSV Upload Modal */}
+      {/* Spreadsheet Upload Modal */}
       {showCsvModal && (
         <div className="modal modal-open">
           <div className="modal-box max-w-2xl">
@@ -381,7 +389,7 @@ export const ClientManager: React.FC = () => {
             {!importDone && csvRows.length === 0 && (
               <div className="space-y-4">
                 <div className="bg-base-200 rounded-lg p-4">
-                  <p className="font-semibold text-sm mb-2">CSV Format Required:</p>
+                  <p className="font-semibold text-sm mb-2">Google Sheets Format Required:</p>
                   <code className="text-xs block bg-base-300 p-3 rounded font-mono">
                     account_number,name,address,contact_name,contact_phone,service_type,notes<br />
                     ACC-1001,Acme Corp,123 Main St,John Smith,555-0101,HVAC,Monthly maintenance<br />
@@ -402,7 +410,7 @@ export const ClientManager: React.FC = () => {
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".csv,.txt"
+                  accept=".xlsx,.xls,.csv"
                   className="file-input file-input-bordered w-full"
                   onChange={handleFileSelect}
                 />

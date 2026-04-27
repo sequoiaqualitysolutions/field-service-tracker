@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { Users, Plus, Edit, Trash2, X, Shield, Wrench, Upload, Download, CheckCircle, AlertCircle, UserCheck } from 'lucide-react';
 import { Profile } from '../types';
 import { supabase } from '../lib/supabase';
@@ -19,20 +20,19 @@ interface ImportResult {
   error?: string;
 }
 
-function parseCsv(text: string): CsvRow[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, ''));
-  return lines.slice(1).map(line => {
-    const vals = line.match(/(".*?"|[^,]*)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || [];
-    const row: Record<string, string> = {};
-    headers.forEach((h, i) => { row[h] = vals[i] || ''; });
+function parseSpreadsheet(data: ArrayBuffer): CsvRow[] {
+  const wb = XLSX.read(data, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
+  return raw.map(row => {
+    const r: Record<string, string> = {};
+    Object.entries(row).forEach(([k, v]) => { r[k.trim().toLowerCase().replace(/[^a-z_]/g, '')] = String(v).trim(); });
     return {
-      name: row['name'] || row['full_name'] || '',
-      email: row['email'] || row['email_address'] || '',
-      password: row['password'] || '',
-      role: (row['role'] || 'tech').toLowerCase(),
-      hourly_rate: row['hourly_rate'] || row['rate'] || '25.00',
+      name: r['name'] || r['full_name'] || r['fullname'] || '',
+      email: r['email'] || r['email_address'] || r['emailaddress'] || '',
+      password: r['password'] || '',
+      role: (r['role'] || 'tech').toLowerCase(),
+      hourly_rate: r['hourly_rate'] || r['hourlyrate'] || r['rate'] || '25.00',
     };
   }).filter(r => r.name && r.email);
 }
@@ -149,12 +149,12 @@ export const UserManager: React.FC = () => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const rows = parseCsv(text);
+      const data = ev.target?.result as ArrayBuffer;
+      const rows = parseSpreadsheet(data);
       setCsvRows(rows);
-      setError(rows.length === 0 ? 'No valid rows found. Check your CSV format.' : '');
+      setError(rows.length === 0 ? 'No valid rows found. Check your spreadsheet format.' : '');
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   }
 
   async function handleBulkImport() {
@@ -197,12 +197,21 @@ export const UserManager: React.FC = () => {
   }
 
   function downloadTemplate() {
-    const csv = 'name,email,password,role,hourly_rate\nJohn Smith,john@example.com,TempPass123!,tech,25.00\nJane Doe,jane@example.com,TempPass123!,team_leader,30.00\nBob Jones,bob@example.com,TempPass123!,tech,25.00';
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const wb = XLSX.utils.book_new();
+    const data = [
+      { name: 'John Smith', email: 'john@example.com', password: 'TempPass123!', role: 'tech', hourly_rate: '25.00' },
+      { name: 'Jane Doe', email: 'jane@example.com', password: 'TempPass123!', role: 'team_leader', hourly_rate: '30.00' },
+      { name: 'Bob Jones', email: 'bob@example.com', password: 'TempPass123!', role: 'tech', hourly_rate: '25.00' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 16 }, { wch: 14 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Users');
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'users-template.csv';
+    a.download = 'users-template.xlsx';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -219,7 +228,7 @@ export const UserManager: React.FC = () => {
         </h2>
         <div className="flex gap-2">
           <button className="btn btn-outline btn-sm" onClick={openCsvUpload}>
-            <Upload size={16} /> Bulk CSV Upload
+            <Upload size={16} /> Bulk Upload (Google Sheets)
           </button>
           <button className="btn btn-primary btn-sm" onClick={openAdd}>
             <Plus size={16} /> Add User
@@ -314,7 +323,7 @@ export const UserManager: React.FC = () => {
         </div>
       )}
 
-      {/* CSV Upload Modal */}
+      {/* Spreadsheet Upload Modal */}
       {showCsvModal && (
         <div className="modal modal-open">
           <div className="modal-box max-w-2xl">
@@ -328,7 +337,7 @@ export const UserManager: React.FC = () => {
             {!importDone && csvRows.length === 0 && (
               <div className="space-y-4">
                 <div className="bg-base-200 rounded-lg p-4">
-                  <p className="font-semibold text-sm mb-2">CSV Format Required:</p>
+                  <p className="font-semibold text-sm mb-2">Google Sheets Format Required:</p>
                   <code className="text-xs block bg-base-300 p-3 rounded font-mono">
                     name,email,password,role,hourly_rate<br />
                     John Smith,john@example.com,TempPass123!,tech,25.00<br />
@@ -349,7 +358,7 @@ export const UserManager: React.FC = () => {
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".csv,.txt"
+                  accept=".xlsx,.xls,.csv"
                   className="file-input file-input-bordered w-full"
                   onChange={handleFileSelect}
                 />
