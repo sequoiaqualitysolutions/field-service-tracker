@@ -98,7 +98,7 @@ export const PayReport: React.FC = () => {
       };
     });
     const ws1 = XLSX.utils.json_to_sheet(summaryData);
-    ws1['!cols'] = Object.keys(summaryData[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+    ws1['!cols'] = [{ wch: 20 }, { wch: 28 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
 
     // --- Detailed Entries Sheet ---
@@ -133,7 +133,7 @@ export const PayReport: React.FC = () => {
       };
     });
     const ws2 = XLSX.utils.json_to_sheet(detailData);
-    ws2['!cols'] = Object.keys(detailData[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+    ws2['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 14 }];
     XLSX.utils.book_append_sheet(wb, ws2, 'Detailed Entries');
 
     XLSX.writeFile(wb, `pay-report-${monthNames[month]}-${year}.xlsx`);
