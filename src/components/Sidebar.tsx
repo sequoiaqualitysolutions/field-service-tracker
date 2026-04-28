@@ -63,10 +63,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
       <div className="p-4 border-b border-base-300">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/sqs-logo.svg" alt="SQS" className="h-8 w-8" />
+            <img src="/spcs-logo.png" alt="SPCS" className="h-9" />
             <div>
-              <h2 className="font-bold text-xs text-primary tracking-wide leading-tight">SEQUOIA QUALITY</h2>
-              <h2 className="font-bold text-xs text-primary tracking-wide leading-tight">SOLUTIONS</h2>
+              <h2 className="font-black text-xs tracking-wider leading-tight" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>SCIENTIFIC PEST</h2>
+              <h2 className="font-black text-xs tracking-wider leading-tight" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>CONTROL SERVICES</h2>
             </div>
           </div>
           {/* Close button on mobile */}
