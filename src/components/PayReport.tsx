@@ -4,7 +4,6 @@ import { Profile, TimeEntry } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatDuration, calcHours, getWeeksInMonth } from '../utils/helpers';
 
-import * as XLSX from 'xlsx';
 
 export const PayReport: React.FC = () => {
   const [techs, setTechs] = useState<Profile[]>([]);
@@ -72,37 +71,52 @@ export const PayReport: React.FC = () => {
     return { techEntries, totalHours, weeklyHours, regularHours, overtimeHours, gpsFlags, distanceFlags, shortVisitFlags, totalFlags };
   }
 
-  function exportSpreadsheet() {
-    const wb = XLSX.utils.book_new();
+  function exportReport() {
+    const lines: string[] = [];
+    const esc = (v: any) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
 
-    // --- Summary Sheet ---
-    const summaryData = techs.map(t => {
+    // --- Summary Section ---
+    lines.push('PAY REPORT SUMMARY');
+    lines.push(`Month:,${monthNames[month]} ${year}`);
+    lines.push('');
+    lines.push(['Technician','Email','Hourly Rate','Regular Hours','OT Hours','Total Hours','Regular Pay','OT Pay (1.5x)','Total Pay','GPS Missing','Distance > 1km','Short Visit','Total Flags'].join(','));
+    
+    techs.forEach(t => {
       const d = getTechData(t.id);
       const rate = Number(t.hourly_rate);
       const regPay = d.regularHours * rate;
       const otPay = d.overtimeHours * rate * 1.5;
-      return {
-        'Technician': t.name,
-        'Email': t.email,
-        'Hourly Rate': rate,
-        'Regular Hours': Number(d.regularHours.toFixed(2)),
-        'OT Hours': Number(d.overtimeHours.toFixed(2)),
-        'Total Hours': Number(d.totalHours.toFixed(2)),
-        'Regular Pay': Number(regPay.toFixed(2)),
-        'OT Pay (1.5x)': Number(otPay.toFixed(2)),
-        'Total Pay': Number((regPay + otPay).toFixed(2)),
-        'GPS Missing': d.gpsFlags,
-        'Distance > 1km': d.distanceFlags,
-        'Short Visit': d.shortVisitFlags,
-        'Total Flags': d.totalFlags,
-      };
+      lines.push([
+        esc(t.name), esc(t.email), rate.toFixed(2),
+        d.regularHours.toFixed(2), d.overtimeHours.toFixed(2), d.totalHours.toFixed(2),
+        regPay.toFixed(2), otPay.toFixed(2), (regPay + otPay).toFixed(2),
+        d.gpsFlags, d.distanceFlags, d.shortVisitFlags, d.totalFlags
+      ].join(','));
     });
-    const ws1 = XLSX.utils.json_to_sheet(summaryData);
-    ws1['!cols'] = [{ wch: 20 }, { wch: 28 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 12 }];
-    XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
 
-    // --- Detailed Entries Sheet ---
-    const detailData = entries.map(e => {
+    // Totals row
+    let tReg = 0, tOT = 0, tPay = 0;
+    techs.forEach(t => {
+      const d = getTechData(t.id);
+      const rate = Number(t.hourly_rate);
+      tReg += d.regularHours;
+      tOT += d.overtimeHours;
+      tPay += (d.regularHours * rate) + (d.overtimeHours * rate * 1.5);
+    });
+    lines.push(['TOTALS','','',tReg.toFixed(2),tOT.toFixed(2),(tReg+tOT).toFixed(2),'','',tPay.toFixed(2),'','','',''].join(','));
+
+    // Blank separator
+    lines.push('');
+    lines.push('');
+
+    // --- Detailed Entries Section ---
+    lines.push('DETAILED ENTRIES');
+    lines.push(['Technician','Client','Activity','Account #','Date','Clock In','Clock Out','Hours','Notes','GPS Missing','Distance > 1km','Short Visit'].join(','));
+    
+    entries.forEach(e => {
       const techName = (e.profiles as any)?.name || 'Unknown';
       const isInternal = (e.clients as any)?.service_type === 'INTERNAL';
       const clientName = isInternal ? '' : ((e.clients as any)?.name || 'Unknown');
@@ -111,32 +125,28 @@ export const PayReport: React.FC = () => {
       const date = new Date(e.start_time).toLocaleDateString();
       const clockIn = new Date(e.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const clockOut = e.end_time ? new Date(e.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-      const hrs = Number(calcHours(e.start_time, e.end_time).toFixed(2));
+      const hrs = calcHours(e.start_time, e.end_time).toFixed(2);
       const notes = (e.notes || '').replace(/\n/g, ' ');
       const gpsMissing = isInternal ? '' : ((e.start_lat == null || e.stop_lat == null) ? 'YES' : '');
-      const distFlag = isInternal ? '' : ((e.distance_km != null && e.distance_km > 1) ? `YES (${e.distance_km.toFixed(2)}km)` : '');
+      const distFlag = isInternal ? '' : ((e.distance_km != null && e.distance_km > 1) ? 'YES (' + e.distance_km.toFixed(2) + 'km)' : '');
       const durMin = e.end_time ? (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000 : 999;
-      const shortFlag = isInternal ? '' : (durMin < 10 ? `YES (${Math.round(durMin)}min)` : '');
-      return {
-        'Technician': techName,
-        'Client': clientName,
-        'Activity': activityName,
-        'Account #': acctNum,
-        'Date': date,
-        'Clock In': clockIn,
-        'Clock Out': clockOut,
-        'Hours': hrs,
-        'Notes': notes,
-        'GPS Missing': gpsMissing,
-        'Distance > 1km': distFlag,
-        'Short Visit': shortFlag,
-      };
+      const shortFlag = isInternal ? '' : (durMin < 10 ? 'YES (' + Math.round(durMin) + 'min)' : '');
+      
+      lines.push([
+        esc(techName), esc(clientName), esc(activityName), esc(acctNum),
+        date, clockIn, clockOut, hrs, esc(notes),
+        gpsMissing, esc(distFlag), esc(shortFlag)
+      ].join(','));
     });
-    const ws2 = XLSX.utils.json_to_sheet(detailData);
-    ws2['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 14 }];
-    XLSX.utils.book_append_sheet(wb, ws2, 'Detailed Entries');
 
-    XLSX.writeFile(wb, `pay-report-${monthNames[month]}-${year}.xlsx`);
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pay-report-${monthNames[month]}-${year}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -164,7 +174,7 @@ export const PayReport: React.FC = () => {
           <select className="select select-bordered select-sm" value={year} onChange={e => setYear(Number(e.target.value))}>
             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <button className="btn btn-primary btn-sm" onClick={exportSpreadsheet}>
+          <button className="btn btn-primary btn-sm" onClick={exportReport}>
             <Download size={14} /> Export Report
           </button>
         </div>
