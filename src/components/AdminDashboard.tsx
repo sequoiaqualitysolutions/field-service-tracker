@@ -198,16 +198,13 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="p-4 space-y-4">
       {/* SPCS Company Header */}
-      <div className="bg-base-100 rounded-xl p-4 shadow border border-primary/10 flex items-center gap-4 flex-wrap">
-        <img src="/spcs-logo.png" alt="Scientific Pest Control Services" className="h-14" />
-        <div>
-          <h1 className="text-lg font-black tracking-wider" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>
-            SCIENTIFIC PEST CONTROL SERVICES
-          </h1>
-          <p className="text-xs italic text-base-content/60" style={{ fontFamily: 'Arial, sans-serif' }}>
-            Specialists in Food, Pharmaceutical Packaging Industries and Fumigation
-          </p>
-        </div>
+      <div className="bg-base-100 rounded-xl p-4 shadow border border-primary/10">
+        <h1 className="text-lg font-black tracking-wider" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>
+          SCIENTIFIC PEST CONTROL SERVICES
+        </h1>
+        <p className="text-xs italic text-base-content/60" style={{ fontFamily: 'Arial, sans-serif' }}>
+          Specialists in Food, Pharmaceutical Packaging Industries and Fumigation
+        </p>
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">

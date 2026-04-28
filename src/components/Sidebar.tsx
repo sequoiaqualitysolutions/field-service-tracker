@@ -62,12 +62,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
     <div className="w-64 bg-base-200 flex flex-col h-full border-r border-base-300">
       <div className="p-4 border-b border-base-300">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src="/spcs-logo.png" alt="SPCS" className="h-9" />
-            <div>
-              <h2 className="font-black text-xs tracking-wider leading-tight" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>SCIENTIFIC PEST</h2>
-              <h2 className="font-black text-xs tracking-wider leading-tight" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>CONTROL SERVICES</h2>
-            </div>
+          <div>
+            <h2 className="font-black text-xs tracking-wider leading-tight" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>SCIENTIFIC PEST</h2>
+            <h2 className="font-black text-xs tracking-wider leading-tight" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>CONTROL SERVICES</h2>
           </div>
           {/* Close button on mobile */}
           <button className="btn btn-ghost btn-xs md:hidden" onClick={onClose}>
