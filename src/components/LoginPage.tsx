@@ -40,12 +40,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       <div className="card bg-base-100 w-full max-w-md shadow-2xl border border-primary/20 relative z-10">
         <div className="card-body">
           <div className="text-center mb-6">
-            <img src="/sqs-logo.svg" alt="Sequoia Quality Solutions" className="h-20 w-20 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold tracking-wide" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              SEQUOIA QUALITY SOLUTIONS
+            <img src="/spcs-logo.png" alt="Scientific Pest Control Services" className="h-28 mx-auto mb-3" />
+            <h1 className="text-xl font-black tracking-wider text-base-content" style={{ fontFamily: "'Waukegan LDO Black', 'Arial Black', sans-serif" }}>
+              SCIENTIFIC PEST CONTROL SERVICES
             </h1>
-            <p className="text-sm text-primary font-medium mt-1">Field Service Tracker</p>
-            <p className="text-xs text-base-content/40 mt-2">Sign in to continue</p>
+            <p className="text-xs italic text-base-content/60 mt-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+              Specialists in Food, Pharmaceutical Packaging Industries and Fumigation
+            </p>
+            <div className="divider my-2"></div>
+            <p className="text-sm text-primary font-medium">Field Service Time Tracker</p>
+            <p className="text-xs text-base-content/40 mt-1">Sign in to continue</p>
           </div>
 
           {error && (
@@ -87,9 +91,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </button>
           </form>
 
-          <p className="text-center text-xs text-base-content/30 mt-4">
-            © {new Date().getFullYear()} Sequoia Quality Solutions
-          </p>
+          <div className="text-center mt-4 space-y-1">
+            <p className="text-xs text-base-content/30">
+              Powered by <img src="/sqs-logo.svg" alt="SQS" className="inline h-4 align-middle" /> <strong>Sequoia Quality Solutions</strong>
+            </p>
+            <p className="text-xs text-base-content/20">
+              © {new Date().getFullYear()} Sequoia Quality Solutions™ · Field Service Time Tracker™
+            </p>
+          </div>
         </div>
       </div>
     </div>
