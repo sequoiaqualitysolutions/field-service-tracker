@@ -411,7 +411,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-semibold">{t.name}</p>
-                    <p className="text-xs text-base-content/50">${Number(t.hourly_rate).toFixed(2)}/hr</p>
+                    <p className="text-xs text-base-content/50">R{Number(t.hourly_rate).toFixed(2)}/hr</p>
                   </div>
                   {hasOt ? (
                     <span className="badge badge-error badge-sm animate-pulse">⚠ OT</span>

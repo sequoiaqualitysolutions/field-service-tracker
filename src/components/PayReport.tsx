@@ -37,24 +37,37 @@ export const PayReport: React.FC = () => {
 
   const weeks = getWeeksInMonth(year, month);
 
+  function isSunday(dateStr: string) {
+    return new Date(dateStr).getDay() === 0;
+  }
+
   function getTechData(techId: string) {
     const techEntries = entries.filter(e => e.tech_id === techId);
     const totalHours = techEntries.reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0);
 
-    const weeklyHours = weeks.map(w =>
-      techEntries
-        .filter(e => {
-          const day = new Date(e.start_time).getDate();
-          return day >= w.startDay && day <= w.endDay;
-        })
-        .reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0)
-    );
+    // Split hours per week into weekday and Sunday
+    const weeklyData = weeks.map(w => {
+      const weekEntries = techEntries.filter(e => {
+        const day = new Date(e.start_time).getDate();
+        return day >= w.startDay && day <= w.endDay;
+      });
+      const weekdayHours = weekEntries
+        .filter(e => !isSunday(e.start_time))
+        .reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0);
+      const sundayHours = weekEntries
+        .filter(e => isSunday(e.start_time))
+        .reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0);
+      return { weekdayHours, sundayHours, totalHours: weekdayHours + sundayHours };
+    });
 
+    // Regular / OT is calculated on weekday hours only (Sunday is separate at 2x)
     let regularHours = 0;
     let overtimeHours = 0;
-    weeklyHours.forEach(h => {
-      if (h <= 45) { regularHours += h; }
-      else { regularHours += 45; overtimeHours += h - 45; }
+    let sundayHours = 0;
+    weeklyData.forEach(w => {
+      if (w.weekdayHours <= 45) { regularHours += w.weekdayHours; }
+      else { regularHours += 45; overtimeHours += w.weekdayHours - 45; }
+      sundayHours += w.sundayHours;
     });
 
     const gpsFlags = techEntries.filter(e =>
@@ -68,7 +81,7 @@ export const PayReport: React.FC = () => {
     ).length;
     const totalFlags = gpsFlags + distanceFlags + shortVisitFlags;
 
-    return { techEntries, totalHours, weeklyHours, regularHours, overtimeHours, gpsFlags, distanceFlags, shortVisitFlags, totalFlags };
+    return { techEntries, totalHours, weeklyData, regularHours, overtimeHours, sundayHours, gpsFlags, distanceFlags, shortVisitFlags, totalFlags };
   }
 
   function exportReport() {
@@ -82,31 +95,33 @@ export const PayReport: React.FC = () => {
     lines.push('PAY REPORT SUMMARY');
     lines.push(`Month:,${monthNames[month]} ${year}`);
     lines.push('');
-    lines.push(['Technician','Email','Hourly Rate','Regular Hours','OT Hours','Total Hours','Regular Pay','OT Pay (1.5x)','Total Pay','GPS Missing','Distance > 1km','Short Visit','Total Flags'].join(','));
+    lines.push(['Technician','Email','Hourly Rate','Regular Hours','OT Hours (1.5x)','Sunday Hours (2x)','Total Hours','Regular Pay','OT Pay','Sunday Pay','Total Pay','GPS Missing','Distance > 1km','Short Visit','Total Flags'].join(','));
     
     techs.forEach(t => {
       const d = getTechData(t.id);
       const rate = Number(t.hourly_rate);
       const regPay = d.regularHours * rate;
       const otPay = d.overtimeHours * rate * 1.5;
+      const sunPay = d.sundayHours * rate * 2;
       lines.push([
         esc(t.name), esc(t.email), rate.toFixed(2),
-        d.regularHours.toFixed(2), d.overtimeHours.toFixed(2), d.totalHours.toFixed(2),
-        regPay.toFixed(2), otPay.toFixed(2), (regPay + otPay).toFixed(2),
+        d.regularHours.toFixed(2), d.overtimeHours.toFixed(2), d.sundayHours.toFixed(2), d.totalHours.toFixed(2),
+        regPay.toFixed(2), otPay.toFixed(2), sunPay.toFixed(2), (regPay + otPay + sunPay).toFixed(2),
         d.gpsFlags, d.distanceFlags, d.shortVisitFlags, d.totalFlags
       ].join(','));
     });
 
     // Totals row
-    let tReg = 0, tOT = 0, tPay = 0;
+    let tReg = 0, tOT = 0, tSun = 0, tPay = 0;
     techs.forEach(t => {
       const d = getTechData(t.id);
       const rate = Number(t.hourly_rate);
       tReg += d.regularHours;
       tOT += d.overtimeHours;
-      tPay += (d.regularHours * rate) + (d.overtimeHours * rate * 1.5);
+      tSun += d.sundayHours;
+      tPay += (d.regularHours * rate) + (d.overtimeHours * rate * 1.5) + (d.sundayHours * rate * 2);
     });
-    lines.push(['TOTALS','','',tReg.toFixed(2),tOT.toFixed(2),(tReg+tOT).toFixed(2),'','',tPay.toFixed(2),'','','',''].join(','));
+    lines.push(['TOTALS','','',tReg.toFixed(2),tOT.toFixed(2),tSun.toFixed(2),(tReg+tOT+tSun).toFixed(2),'','','',tPay.toFixed(2),'','','',''].join(','));
 
     // Blank separator
     lines.push('');
@@ -114,7 +129,7 @@ export const PayReport: React.FC = () => {
 
     // --- Detailed Entries Section ---
     lines.push('DETAILED ENTRIES');
-    lines.push(['Technician','Client','Activity','Account #','Date','Clock In','Clock Out','Hours','Notes','GPS Missing','Distance > 1km','Short Visit'].join(','));
+    lines.push(['Technician','Client','Activity','Account #','Date','Day','Clock In','Clock Out','Hours','Sunday','Notes','GPS Missing','Distance > 1km','Short Visit'].join(','));
     
     entries.forEach(e => {
       const techName = (e.profiles as any)?.name || 'Unknown';
@@ -122,10 +137,13 @@ export const PayReport: React.FC = () => {
       const clientName = isInternal ? '' : ((e.clients as any)?.name || 'Unknown');
       const activityName = isInternal ? ((e.clients as any)?.name || '').replace(/[\u{1F4CB}\u{1F527}\u{1F697}\u{1F4DA}\u{1F37D}]\s*/gu, '') : '';
       const acctNum = isInternal ? '' : ((e.clients as any)?.account_number || '');
-      const date = new Date(e.start_time).toLocaleDateString();
-      const clockIn = new Date(e.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const entryDate = new Date(e.start_time);
+      const date = entryDate.toLocaleDateString();
+      const dayName = entryDate.toLocaleDateString('en-US', { weekday: 'short' });
+      const clockIn = entryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const clockOut = e.end_time ? new Date(e.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const hrs = calcHours(e.start_time, e.end_time).toFixed(2);
+      const isSun = isSunday(e.start_time) ? 'YES' : '';
       const notes = (e.notes || '').replace(/\n/g, ' ');
       const gpsMissing = isInternal ? '' : ((e.start_lat == null || e.stop_lat == null) ? 'YES' : '');
       const distFlag = isInternal ? '' : ((e.distance_km != null && e.distance_km > 1) ? 'YES (' + e.distance_km.toFixed(2) + 'km)' : '');
@@ -134,7 +152,7 @@ export const PayReport: React.FC = () => {
       
       lines.push([
         esc(techName), esc(clientName), esc(activityName), esc(acctNum),
-        date, clockIn, clockOut, hrs, esc(notes),
+        date, dayName, clockIn, clockOut, hrs, isSun, esc(notes),
         gpsMissing, esc(distFlag), esc(shortFlag)
       ].join(','));
     });
@@ -152,13 +170,14 @@ export const PayReport: React.FC = () => {
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   // Grand totals
-  let grandRegular = 0, grandOT = 0, grandPay = 0;
+  let grandRegular = 0, grandOT = 0, grandSunday = 0, grandPay = 0;
   techs.forEach(t => {
     const d = getTechData(t.id);
     const rate = Number(t.hourly_rate);
     grandRegular += d.regularHours;
     grandOT += d.overtimeHours;
-    grandPay += d.regularHours * rate + d.overtimeHours * rate * 1.5;
+    grandSunday += d.sundayHours;
+    grandPay += d.regularHours * rate + d.overtimeHours * rate * 1.5 + d.sundayHours * rate * 2;
   });
 
   return (
@@ -181,18 +200,22 @@ export const PayReport: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="stat bg-base-200 rounded-lg p-3">
           <div className="stat-title text-xs">Regular Hours</div>
           <div className="stat-value text-xl text-success">{grandRegular.toFixed(1)}</div>
         </div>
         <div className="stat bg-base-200 rounded-lg p-3">
-          <div className="stat-title text-xs">Overtime Hours</div>
+          <div className="stat-title text-xs">Overtime Hours (1.5x)</div>
           <div className={`stat-value text-xl ${grandOT > 0 ? 'text-error' : ''}`}>{grandOT.toFixed(1)}</div>
         </div>
         <div className="stat bg-base-200 rounded-lg p-3">
+          <div className="stat-title text-xs">Sunday Hours (2x)</div>
+          <div className={`stat-value text-xl ${grandSunday > 0 ? 'text-warning' : ''}`}>{grandSunday.toFixed(1)}</div>
+        </div>
+        <div className="stat bg-base-200 rounded-lg p-3">
           <div className="stat-title text-xs">Total Payroll</div>
-          <div className="stat-value text-xl">${grandPay.toFixed(2)}</div>
+          <div className="stat-value text-xl">R{grandPay.toFixed(2)}</div>
         </div>
       </div>
 
@@ -202,19 +225,22 @@ export const PayReport: React.FC = () => {
         const rate = Number(t.hourly_rate);
         const regPay = d.regularHours * rate;
         const otPay = d.overtimeHours * rate * 1.5;
-        const totalPay = regPay + otPay;
+        const sunPay = d.sundayHours * rate * 2;
+        const totalPay = regPay + otPay + sunPay;
+        const hasOTOrSunday = d.overtimeHours > 0 || d.sundayHours > 0;
 
         return (
-          <div key={t.id} className={`card ${d.overtimeHours > 0 ? 'bg-error/10 border border-error/30' : 'bg-base-200'}`}>
+          <div key={t.id} className={`card ${hasOTOrSunday ? 'bg-error/10 border border-error/30' : 'bg-base-200'}`}>
             <div className="card-body p-4">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold">{t.name}</h3>
-                  <p className="text-xs text-base-content/50">{t.email} • ${rate.toFixed(2)}/hr</p>
+                  <p className="text-xs text-base-content/50">{t.email} • R{rate.toFixed(2)}/hr</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">${totalPay.toFixed(2)}</p>
-                  {d.overtimeHours > 0 && <span className="badge badge-error badge-xs">OT: +${otPay.toFixed(2)}</span>}
+                  <p className="text-lg font-bold">R{totalPay.toFixed(2)}</p>
+                  {d.overtimeHours > 0 && <span className="badge badge-error badge-xs">OT 1.5x: +R{otPay.toFixed(2)}</span>}
+                  {d.sundayHours > 0 && <span className="badge badge-warning badge-xs ml-1">Sun 2x: +R{sunPay.toFixed(2)}</span>}
                   {d.gpsFlags > 0 && (
                     <span className="badge badge-warning badge-xs mt-1 flex items-center gap-1">
                       🟡 {d.gpsFlags} GPS missing
@@ -239,23 +265,31 @@ export const PayReport: React.FC = () => {
                   <thead>
                     <tr>
                       <th>Week</th>
-                      <th>Hours</th>
+                      <th>Total</th>
                       <th>Regular</th>
-                      <th>OT</th>
+                      <th>OT (1.5x)</th>
+                      <th>Sunday (2x)</th>
                       <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {d.weeklyHours.map((h, i) => {
-                      const reg = Math.min(h, 45);
-                      const ot = Math.max(0, h - 45);
+                    {d.weeklyData.map((w, i) => {
+                      const reg = Math.min(w.weekdayHours, 45);
+                      const ot = Math.max(0, w.weekdayHours - 45);
+                      const hasFlags = ot > 0 || w.sundayHours > 0;
                       return (
-                        <tr key={i} className={ot > 0 ? 'text-error' : ''}>
+                        <tr key={i} className={hasFlags ? 'text-error' : ''}>
                           <td>{weeks[i].label}</td>
-                          <td className="font-semibold">{h.toFixed(1)}h</td>
+                          <td className="font-semibold">{w.totalHours.toFixed(1)}h</td>
                           <td>{reg.toFixed(1)}h</td>
                           <td>{ot > 0 ? `+${ot.toFixed(1)}h` : '—'}</td>
-                          <td>{ot > 0 ? '🔴 Over' : h > 0 ? '✅' : '—'}</td>
+                          <td className={w.sundayHours > 0 ? 'text-warning font-semibold' : ''}>{w.sundayHours > 0 ? `${w.sundayHours.toFixed(1)}h` : '—'}</td>
+                          <td>
+                            {ot > 0 && '🔴 OT '}
+                            {w.sundayHours > 0 && '🟡 Sun '}
+                            {ot === 0 && w.sundayHours === 0 && w.totalHours > 0 && '✅'}
+                            {w.totalHours === 0 && '—'}
+                          </td>
                         </tr>
                       );
                     })}
@@ -266,7 +300,8 @@ export const PayReport: React.FC = () => {
                       <td>{d.totalHours.toFixed(1)}h</td>
                       <td>{d.regularHours.toFixed(1)}h</td>
                       <td className={d.overtimeHours > 0 ? 'text-error' : ''}>{d.overtimeHours > 0 ? `+${d.overtimeHours.toFixed(1)}h` : '—'}</td>
-                      <td>${totalPay.toFixed(2)}</td>
+                      <td className={d.sundayHours > 0 ? 'text-warning' : ''}>{d.sundayHours > 0 ? `${d.sundayHours.toFixed(1)}h` : '—'}</td>
+                      <td>R{totalPay.toFixed(2)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -283,6 +318,7 @@ export const PayReport: React.FC = () => {
                       <thead>
                         <tr>
                           <th>Date</th>
+                          <th>Day</th>
                           <th>Client</th>
                           <th>Activity</th>
                           <th>In</th>
@@ -301,12 +337,17 @@ export const PayReport: React.FC = () => {
                           if (!isEntryInternal && (entry.start_lat == null || entry.stop_lat == null)) flags.push('🟡 No GPS');
                           if (!isEntryInternal && entry.distance_km != null && entry.distance_km > 1) flags.push(`🔴 ${entry.distance_km.toFixed(1)}km`);
                           if (durMin < 10) flags.push(`⏱️ ${Math.round(durMin)}min`);
+                          const isSun = isSunday(entry.start_time);
+                          if (isSun) flags.push('☀️ Sun 2x');
+                          const entryDate = new Date(entry.start_time);
+                          const dayName = entryDate.toLocaleDateString('en-US', { weekday: 'short' });
                           return (
-                            <tr key={entry.id}>
-                              <td className="whitespace-nowrap">{new Date(entry.start_time).toLocaleDateString()}</td>
+                            <tr key={entry.id} className={isSun ? 'bg-warning/10' : ''}>
+                              <td className="whitespace-nowrap">{entryDate.toLocaleDateString()}</td>
+                              <td className={isSun ? 'text-warning font-bold' : ''}>{dayName}</td>
                               <td>{(entry.clients as any)?.service_type === 'INTERNAL' ? '—' : ((entry.clients as any)?.name || '—')}</td>
                               <td className="text-amber-500 font-medium">{(entry.clients as any)?.service_type === 'INTERNAL' ? ((entry.clients as any)?.name || '').replace(/[📋🔧🚗📚]\s*/g, '') : '—'}</td>
-                              <td className="whitespace-nowrap">{new Date(entry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                              <td className="whitespace-nowrap">{entryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                               <td className="whitespace-nowrap">{entry.end_time ? new Date(entry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                               <td>{hrs.toFixed(1)}h</td>
                               <td className="text-xs text-base-content/70 max-w-[200px]">{entry.notes || <span className="text-base-content/30 italic">No notes</span>}</td>
