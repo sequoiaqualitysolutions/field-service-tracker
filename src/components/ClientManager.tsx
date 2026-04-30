@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Plus, Search, Edit, Trash2, Building2, X, UserCheck, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Building2, X, UserCheck, Upload, Download, CheckCircle, AlertCircle, RefreshCw, Save, ExternalLink } from 'lucide-react';
 import { Client, Profile } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -50,7 +50,7 @@ export const ClientManager: React.FC = () => {
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState({
     account_number: '', name: '', address: '', contact_name: '',
-    contact_phone: '', service_type: '', notes: ''
+    contact_phone: '', contact_email: '', service_type: '', ship_address: '', notes: ''
   });
   const [selectedTechIds, setSelectedTechIds] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
@@ -61,7 +61,60 @@ export const ClientManager: React.FC = () => {
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { loadClients(); loadTechs(); }, []);
+  // Google Sheets Sync state
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [sheetUrlSaved, setSheetUrlSaved] = useState('');
+  const [sheetUrlLoading, setSheetUrlLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ added: number; updated: number; skipped: number; errors: number; total: number } | null>(null);
+  const [syncError, setSyncError] = useState('');
+
+  useEffect(() => { loadClients(); loadTechs(); loadSheetUrl(); }, []);
+
+  async function loadSheetUrl() {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'google_sheet_url')
+      .maybeSingle();
+    if (data?.value) {
+      setSheetUrl(data.value);
+      setSheetUrlSaved(data.value);
+    }
+  }
+
+  async function saveSheetUrl() {
+    setSheetUrlLoading(true);
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({ key: 'google_sheet_url', value: sheetUrl, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    if (error) {
+      setSyncError('Failed to save URL: ' + error.message);
+    } else {
+      setSheetUrlSaved(sheetUrl);
+      setSyncError('');
+    }
+    setSheetUrlLoading(false);
+  }
+
+  async function handleSyncNow() {
+    setSyncing(true);
+    setSyncResult(null);
+    setSyncError('');
+    try {
+      const res = await fetch('/api/sync-clients');
+      const data = await res.json();
+      if (data.error) {
+        setSyncError(data.error);
+      } else {
+        setSyncResult(data);
+        loadClients(); // Refresh client list
+      }
+    } catch (err: any) {
+      setSyncError('Sync failed: ' + (err.message || 'Network error'));
+    }
+    setSyncing(false);
+  }
 
   async function loadTechs() {
     const { data } = await supabase.from('profiles').select('*').in('role', ['tech', 'team_leader']).order('role').order('name');
@@ -78,7 +131,7 @@ export const ClientManager: React.FC = () => {
 
   function openAdd() {
     setEditing(null);
-    setForm({ account_number: '', name: '', address: '', contact_name: '', contact_phone: '', service_type: '', notes: '' });
+    setForm({ account_number: '', name: '', address: '', contact_name: '', contact_phone: '', contact_email: '', service_type: '', ship_address: '', notes: '' });
     setSelectedTechIds([]);
     setShowModal(true);
   }
@@ -88,7 +141,8 @@ export const ClientManager: React.FC = () => {
     setForm({
       account_number: c.account_number, name: c.name, address: c.address || '',
       contact_name: c.contact_name || '', contact_phone: c.contact_phone || '',
-      service_type: c.service_type || '', notes: c.notes || '',
+      contact_email: c.contact_email || '', service_type: c.service_type || '',
+      ship_address: c.ship_address || '', notes: c.notes || '',
     });
     const ids = (c.client_assignments || []).map(a => a.tech_id);
     setSelectedTechIds(ids);
@@ -104,7 +158,8 @@ export const ClientManager: React.FC = () => {
       await supabase.from('clients').update({
         account_number: form.account_number, name: form.name, address: form.address,
         contact_name: form.contact_name, contact_phone: form.contact_phone,
-        service_type: form.service_type, notes: form.notes,
+        contact_email: form.contact_email, service_type: form.service_type,
+        ship_address: form.ship_address, notes: form.notes,
       }).eq('id', editing.id);
 
       await supabase.from('client_assignments').delete().eq('client_id', editing.id);
@@ -119,7 +174,8 @@ export const ClientManager: React.FC = () => {
         .insert({
           account_number: form.account_number, name: form.name, address: form.address,
           contact_name: form.contact_name, contact_phone: form.contact_phone,
-          service_type: form.service_type, notes: form.notes,
+          contact_email: form.contact_email, service_type: form.service_type,
+          ship_address: form.ship_address, notes: form.notes,
         })
         .select('id')
         .single();
@@ -240,6 +296,61 @@ export const ClientManager: React.FC = () => {
         </div>
       </div>
 
+      {/* Google Sheets Sync Section */}
+      <div className="card bg-base-200">
+        <div className="card-body p-4 space-y-3">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            📊 Google Sheets Sync
+          </h3>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              className="input input-bordered input-sm flex-1"
+              placeholder="Published Google Sheet CSV URL..."
+              value={sheetUrl}
+              onChange={e => setSheetUrl(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={saveSheetUrl}
+                disabled={sheetUrlLoading || sheetUrl === sheetUrlSaved}
+              >
+                {sheetUrlLoading ? <span className="loading loading-spinner loading-xs"></span> : <Save size={14} />}
+                Save
+              </button>
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={handleSyncNow}
+                disabled={syncing || !sheetUrlSaved}
+              >
+                {syncing ? <span className="loading loading-spinner loading-xs"></span> : <RefreshCw size={14} />}
+                Sync Now
+              </button>
+            </div>
+          </div>
+          <p className="text-xs text-base-content/50">
+            Publish your Google Sheet: File → Share → Publish to web → Select CSV → Publish. Paste the URL here.
+            <span className="ml-2 text-base-content/40">Auto-syncs every 24 hours</span>
+          </p>
+          {syncError && (
+            <div className="alert alert-error py-2 text-sm">
+              <AlertCircle size={14} />
+              <span>{syncError}</span>
+            </div>
+          )}
+          {syncResult && (
+            <div className="alert alert-success py-2 text-sm">
+              <CheckCircle size={14} />
+              <span>
+                Synced: <strong>{syncResult.added}</strong> added, <strong>{syncResult.updated}</strong> updated, <strong>{syncResult.skipped}</strong> skipped
+                {syncResult.errors > 0 && <>, <strong className="text-error">{syncResult.errors}</strong> errors</>}
+                {' '}({syncResult.total} total rows)
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
       <label className="input input-bordered flex items-center gap-2">
         <Search className="h-[1em] opacity-50" />
         <input type="search" className="grow" placeholder="Search by name, account, or service..."
@@ -268,6 +379,12 @@ export const ClientManager: React.FC = () => {
                   <p className="text-xs text-base-content/60">
                     Contact: {c.contact_name}{c.contact_phone ? ` • ${c.contact_phone}` : ''}
                   </p>
+                )}
+                {c.contact_email && (
+                  <p className="text-xs text-base-content/60">✉ {c.contact_email}</p>
+                )}
+                {c.ship_address && c.ship_address !== c.address && (
+                  <p className="text-xs text-base-content/50">Ship: {c.ship_address}</p>
                 )}
                 {c.notes && <p className="text-xs text-base-content/40 italic mt-1">{c.notes}</p>}
                 <div className="mt-2 pt-2 border-t border-base-300">
@@ -316,6 +433,10 @@ export const ClientManager: React.FC = () => {
                 <input className="input input-bordered w-full" placeholder="Contact Phone"
                   value={form.contact_phone} onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))} />
               </div>
+              <input className="input input-bordered w-full" placeholder="Contact Email"
+                value={form.contact_email} onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))} />
+              <input className="input input-bordered w-full" placeholder="Ship Address"
+                value={form.ship_address} onChange={e => setForm(f => ({ ...f, ship_address: e.target.value }))} />
               <input className="input input-bordered w-full" placeholder="Service Type (e.g. HVAC, Plumbing)"
                 value={form.service_type} onChange={e => setForm(f => ({ ...f, service_type: e.target.value }))} />
               <textarea className="textarea textarea-bordered w-full" placeholder="Notes" rows={2}

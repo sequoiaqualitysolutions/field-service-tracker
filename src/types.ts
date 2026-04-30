@@ -15,7 +15,9 @@ export interface Client {
   address: string;
   contact_name: string;
   contact_phone: string;
+  contact_email?: string;
   service_type: string;
+  ship_address?: string;
   notes: string;
   created_at?: string;
   client_assignments?: { tech_id: string; profiles: { id: string; name: string } }[];

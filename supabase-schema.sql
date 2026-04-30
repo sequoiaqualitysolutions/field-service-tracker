@@ -22,9 +22,18 @@ CREATE TABLE public.clients (
   address TEXT DEFAULT '',
   contact_name TEXT DEFAULT '',
   contact_phone TEXT DEFAULT '',
+  contact_email TEXT DEFAULT '',
   service_type TEXT DEFAULT '',
+  ship_address TEXT DEFAULT '',
   notes TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2b. APP SETTINGS (key-value config store)
+CREATE TABLE IF NOT EXISTS public.app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 3. CLIENT ASSIGNMENTS (which tech services which client)
@@ -58,6 +67,7 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.time_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 -- Helper function
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -72,6 +82,14 @@ CREATE POLICY "Anyone authenticated can view profiles" ON public.profiles
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE TO authenticated USING (id = auth.uid());
+
+-- APP SETTINGS
+CREATE POLICY "Authenticated users can view app_settings" ON public.app_settings
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins can insert app_settings" ON public.app_settings
+  FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "Admins can update app_settings" ON public.app_settings
+  FOR UPDATE TO authenticated USING (public.is_admin());
 
 -- CLIENTS
 CREATE POLICY "Authenticated users can view clients" ON public.clients
