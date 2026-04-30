@@ -93,7 +93,7 @@ export const AdminDashboard: React.FC = () => {
     if ((e.clients as any)?.service_type === 'INTERNAL') return;
     const techName = (e.profiles as any)?.name || 'Unknown';
     const clientName = (e.clients as any)?.name || 'Unknown';
-    const date = new Date(e.start_time).toLocaleDateString();
+    const date = new Date(e.start_time).toLocaleDateString('en-ZA', { timeZone: 'Africa/Johannesburg' });
     if (e.start_lat == null || e.start_lng == null || e.stop_lat == null || e.stop_lng == null) {
       gpsAlerts.push({ techName, clientName, date, reason: 'Missing GPS' });
     } else if (e.distance_km != null && e.distance_km > 1) {
@@ -308,7 +308,7 @@ export const AdminDashboard: React.FC = () => {
                         <td>{entry.clients?.name || 'Unknown'}</td>
                         <td className="text-xs text-base-content/60 max-w-[200px] truncate">{entry.notes || '—'}</td>
                         <td className="text-xs">
-                          {new Date(entry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(entry.start_time).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' })}
                         </td>
                         <td>
                           <span className={`badge badge-sm ${hours >= 9 ? 'badge-error' : 'badge-success'}`}>

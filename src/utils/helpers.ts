@@ -4,8 +4,18 @@ export function formatDuration(hours: number): string {
   return `${h}h ${m}m`;
 }
 
+export const SAST = 'Africa/Johannesburg';
+
 export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', timeZone: SAST });
+}
+
+export function formatDateSAST(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-ZA', { timeZone: SAST });
+}
+
+export function formatDaySAST(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', timeZone: SAST });
 }
 
 export function calcHours(start: string, end: string | null): number {

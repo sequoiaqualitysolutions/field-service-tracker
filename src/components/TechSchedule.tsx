@@ -53,25 +53,28 @@ function addDays(d: Date, n: number): Date {
   r.setDate(r.getDate() + n);
   return r;
 }
+const TZ = 'Africa/Johannesburg';
 function fmtDate(d: Date): string {
   return d.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
+    timeZone: TZ,
   });
 }
 function fmtShortDate(d: Date): string {
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: TZ });
 }
 function fmtWeekday(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'short' });
+  return d.toLocaleDateString('en-US', { weekday: 'short', timeZone: TZ });
 }
 function fmtTime(iso: string): string {
   if (!iso || iso.length <= 10) return 'All day';
-  return new Date(iso).toLocaleTimeString([], {
+  return new Date(iso).toLocaleTimeString('en-ZA', {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: TZ,
   });
 }
 function sameDay(a: Date, b: Date): boolean {
@@ -446,7 +449,7 @@ export const TechSchedule: React.FC<TechScheduleProps> = ({
                 <Wifi size={12} className="text-success" />
                 <span>
                   Synced{' '}
-                  {lastRefresh.toLocaleTimeString([], {
+                  {lastRefresh.toLocaleTimeString('en-ZA', { timeZone: TZ,
                     hour: 'numeric',
                     minute: '2-digit',
                   })}

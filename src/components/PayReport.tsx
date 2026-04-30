@@ -1,16 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Download, Calendar, MapPin } from 'lucide-react';
+import { DollarSign, Download, Calendar, MapPin, Pencil, Trash2, X, Save } from 'lucide-react';
 import { Profile, TimeEntry } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatDuration, calcHours, getWeeksInMonth } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 
+const TZ = 'Africa/Johannesburg';
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { timeZone: TZ });
+const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', timeZone: TZ });
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+const toSASTIso = (dateStr: string, timeStr: string) => {
+  // Build a date string and interpret as SAST (UTC+2)
+  return `${dateStr}T${timeStr}:00+02:00`;
+};
 
 export const PayReport: React.FC = () => {
   const [techs, setTechs] = useState<Profile[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
+  const [selectedTech, setSelectedTech] = useState<string>('all');
+  const [editEntry, setEditEntry] = useState<TimeEntry | null>(null);
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   useEffect(() => { loadData(); }, [month, year]);
 
@@ -46,7 +63,6 @@ export const PayReport: React.FC = () => {
     const techEntries = entries.filter(e => e.tech_id === techId);
     const totalHours = techEntries.reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0);
 
-    // Split hours per week into weekday and Sunday
     const weeklyData = weeks.map(w => {
       const weekEntries = techEntries.filter(e => {
         const day = new Date(e.start_time).getDate();
@@ -61,7 +77,6 @@ export const PayReport: React.FC = () => {
       return { weekdayHours, sundayHours, totalHours: weekdayHours + sundayHours };
     });
 
-    // Regular / OT is calculated on weekday hours only (Sunday is separate at 2x)
     let regularHours = 0;
     let overtimeHours = 0;
     let sundayHours = 0;
@@ -85,18 +100,82 @@ export const PayReport: React.FC = () => {
     return { techEntries, totalHours, weeklyData, regularHours, overtimeHours, sundayHours, gpsFlags, distanceFlags, shortVisitFlags, totalFlags };
   }
 
+  // ===== Admin Edit =====
+  function openEdit(entry: TimeEntry) {
+    setEditEntry(entry);
+    const st = new Date(entry.start_time);
+    const en = entry.end_time ? new Date(entry.end_time) : null;
+    // Format to SAST for the input fields
+    const toSASTDate = (d: Date) => {
+      const parts = d.toLocaleDateString('en-CA', { timeZone: TZ }); // YYYY-MM-DD
+      return parts;
+    };
+    const toSASTTime = (d: Date) => {
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+    };
+    setEditStartDate(toSASTDate(st));
+    setEditStart(toSASTTime(st));
+    setEditEndDate(en ? toSASTDate(en) : '');
+    setEditEnd(en ? toSASTTime(en) : '');
+    setEditNotes(entry.notes || '');
+  }
+
+  async function saveEdit() {
+    if (!editEntry) return;
+    setSaving(true);
+    const startIso = toSASTIso(editStartDate, editStart);
+    const endIso = editEndDate && editEnd ? toSASTIso(editEndDate, editEnd) : null;
+
+    // Recalculate distance if both GPS points exist
+    const updates: any = {
+      start_time: startIso,
+      end_time: endIso,
+      notes: editNotes,
+    };
+
+    const { error } = await supabase
+      .from('time_entries')
+      .update(updates)
+      .eq('id', editEntry.id);
+
+    if (error) {
+      alert('Failed to save: ' + error.message);
+    } else {
+      setEditEntry(null);
+      await loadData();
+    }
+    setSaving(false);
+  }
+
+  async function deleteEntry(id: number) {
+    const { error } = await supabase.from('time_entries').delete().eq('id', id);
+    if (error) {
+      alert('Failed to delete: ' + error.message);
+    } else {
+      setDeleteConfirm(null);
+      await loadData();
+    }
+  }
+
+  // ===== Export =====
   function exportReport() {
     const wb = XLSX.utils.book_new();
+    const exportTechs = selectedTech === 'all' ? techs : techs.filter(t => t.id === selectedTech);
+    const exportEntries = selectedTech === 'all' ? entries : entries.filter(e => e.tech_id === selectedTech);
 
-    // ========== TAB 1: Summary ==========
+    // TAB 1: Summary
     const summaryRows: any[][] = [];
     summaryRows.push(['PAY REPORT SUMMARY']);
     summaryRows.push([`Month: ${monthNames[month]} ${year}`]);
+    if (selectedTech !== 'all') {
+      const techName = techs.find(t => t.id === selectedTech)?.name || '';
+      summaryRows.push([`Technician: ${techName}`]);
+    }
     summaryRows.push([]);
     summaryRows.push(['Technician','Email','Hourly Rate (R)','Regular Hours','OT Hours (1.5x)','Sunday Hours (2x)','Total Hours','Regular Pay (R)','OT Pay (R)','Sunday Pay (R)','Total Pay (R)','GPS Missing','Distance > 1km','Short Visit','Total Flags']);
 
     let tReg = 0, tOT = 0, tSun = 0, tTotalHrs = 0, tPay = 0;
-    techs.forEach(t => {
+    exportTechs.forEach(t => {
       const d = getTechData(t.id);
       const rate = Number(t.hourly_rate);
       const regPay = d.regularHours * rate;
@@ -117,42 +196,29 @@ export const PayReport: React.FC = () => {
 
     const ws1 = XLSX.utils.aoa_to_sheet(summaryRows);
     ws1['!cols'] = [
-      { wch: 20 }, // Technician
-      { wch: 28 }, // Email
-      { wch: 14 }, // Hourly Rate
-      { wch: 14 }, // Regular Hours
-      { wch: 16 }, // OT Hours
-      { wch: 18 }, // Sunday Hours
-      { wch: 14 }, // Total Hours
-      { wch: 16 }, // Regular Pay
-      { wch: 14 }, // OT Pay
-      { wch: 16 }, // Sunday Pay
-      { wch: 16 }, // Total Pay
-      { wch: 14 }, // GPS Missing
-      { wch: 16 }, // Distance
-      { wch: 14 }, // Short Visit
-      { wch: 14 }, // Total Flags
+      { wch: 20 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 },
+      { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 16 },
+      { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
     ];
     XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
 
-    // ========== TAB 2: Detailed Entries ==========
+    // TAB 2: Detailed Entries
     const detailRows: any[][] = [];
     detailRows.push(['DETAILED TIME ENTRIES']);
     detailRows.push([`Month: ${monthNames[month]} ${year}`]);
     detailRows.push([]);
     detailRows.push(['Technician','Client','Activity','Account #','Date','Day','Clock In','Clock Out','Hours','Sunday','Notes','GPS Missing','Distance > 1km','Short Visit']);
 
-    entries.forEach(e => {
+    exportEntries.forEach(e => {
       const techName = (e.profiles as any)?.name || 'Unknown';
       const isInternal = (e.clients as any)?.service_type === 'INTERNAL';
       const clientName = isInternal ? '' : ((e.clients as any)?.name || 'Unknown');
       const activityName = isInternal ? ((e.clients as any)?.name || '').replace(/[\u{1F4CB}\u{1F527}\u{1F697}\u{1F4DA}\u{1F37D}]\s*/gu, '') : '';
       const acctNum = isInternal ? '' : ((e.clients as any)?.account_number || '');
-      const entryDate = new Date(e.start_time);
-      const date = entryDate.toLocaleDateString();
-      const dayName = entryDate.toLocaleDateString('en-US', { weekday: 'short' });
-      const clockIn = entryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const clockOut = e.end_time ? new Date(e.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const date = fmtDate(e.start_time);
+      const dayName = fmtDay(e.start_time);
+      const clockIn = fmtTime(e.start_time);
+      const clockOut = e.end_time ? fmtTime(e.end_time) : '';
       const hrs = Number(calcHours(e.start_time, e.end_time).toFixed(2));
       const isSun = isSunday(e.start_time) ? 'YES' : '';
       const notes = (e.notes || '').replace(/\n/g, ' ');
@@ -170,39 +236,31 @@ export const PayReport: React.FC = () => {
 
     const ws2 = XLSX.utils.aoa_to_sheet(detailRows);
     ws2['!cols'] = [
-      { wch: 18 }, // Technician
-      { wch: 24 }, // Client
-      { wch: 22 }, // Activity
-      { wch: 14 }, // Account #
-      { wch: 14 }, // Date
-      { wch: 8 },  // Day
-      { wch: 12 }, // Clock In
-      { wch: 12 }, // Clock Out
-      { wch: 10 }, // Hours
-      { wch: 10 }, // Sunday
-      { wch: 30 }, // Notes
-      { wch: 14 }, // GPS Missing
-      { wch: 18 }, // Distance
-      { wch: 16 }, // Short Visit
+      { wch: 18 }, { wch: 24 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 8 },
+      { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 30 },
+      { wch: 14 }, { wch: 18 }, { wch: 16 },
     ];
     XLSX.utils.book_append_sheet(wb, ws2, 'Detailed Entries');
 
-    // Generate and download
     const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pay-report-${monthNames[month]}-${year}.xlsx`;
+    const techSuffix = selectedTech !== 'all' ? '-' + (techs.find(t => t.id === selectedTech)?.name || 'tech') : '';
+    a.download = `pay-report-${monthNames[month]}-${year}${techSuffix}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  // Grand totals
+  // Filter techs for display
+  const displayTechs = selectedTech === 'all' ? techs : techs.filter(t => t.id === selectedTech);
+
+  // Grand totals (of displayed techs)
   let grandRegular = 0, grandOT = 0, grandSunday = 0, grandPay = 0;
-  techs.forEach(t => {
+  displayTechs.forEach(t => {
     const d = getTechData(t.id);
     const rate = Number(t.hourly_rate);
     grandRegular += d.regularHours;
@@ -217,12 +275,16 @@ export const PayReport: React.FC = () => {
         <h2 className="text-lg font-bold flex items-center gap-2">
           <DollarSign size={22} className="text-primary" /> Pay Report
         </h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <select className="select select-bordered select-sm" value={month} onChange={e => setMonth(Number(e.target.value))}>
             {monthNames.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
           <select className="select select-bordered select-sm" value={year} onChange={e => setYear(Number(e.target.value))}>
             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select className="select select-bordered select-sm" value={selectedTech} onChange={e => setSelectedTech(e.target.value)}>
+            <option value="all">All Team Members</option>
+            {techs.map(t => <option key={t.id} value={t.id}>{t.name} ({t.role === 'team_leader' ? 'TL' : 'Tech'})</option>)}
           </select>
           <button className="btn btn-primary btn-sm" onClick={exportReport}>
             <Download size={14} /> Export Report
@@ -251,7 +313,7 @@ export const PayReport: React.FC = () => {
       </div>
 
       {/* Per-tech breakdown */}
-      {techs.map(t => {
+      {displayTechs.map(t => {
         const d = getTechData(t.id);
         const rate = Number(t.hourly_rate);
         const regPay = d.regularHours * rate;
@@ -338,7 +400,7 @@ export const PayReport: React.FC = () => {
                 </table>
               </div>
 
-              {/* Detailed entries with notes */}
+              {/* Detailed entries with notes + edit */}
               {d.techEntries.length > 0 && (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-xs font-semibold text-primary hover:text-primary/80">
@@ -357,6 +419,7 @@ export const PayReport: React.FC = () => {
                           <th>Hours</th>
                           <th>Notes</th>
                           <th>Flags</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -370,19 +433,32 @@ export const PayReport: React.FC = () => {
                           if (durMin < 10) flags.push(`⏱️ ${Math.round(durMin)}min`);
                           const isSun = isSunday(entry.start_time);
                           if (isSun) flags.push('☀️ Sun 2x');
-                          const entryDate = new Date(entry.start_time);
-                          const dayName = entryDate.toLocaleDateString('en-US', { weekday: 'short' });
                           return (
                             <tr key={entry.id} className={isSun ? 'bg-warning/10' : ''}>
-                              <td className="whitespace-nowrap">{entryDate.toLocaleDateString()}</td>
-                              <td className={isSun ? 'text-warning font-bold' : ''}>{dayName}</td>
-                              <td>{(entry.clients as any)?.service_type === 'INTERNAL' ? '—' : ((entry.clients as any)?.name || '—')}</td>
-                              <td className="text-amber-500 font-medium">{(entry.clients as any)?.service_type === 'INTERNAL' ? ((entry.clients as any)?.name || '').replace(/[📋🔧🚗📚]\s*/g, '') : '—'}</td>
-                              <td className="whitespace-nowrap">{entryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                              <td className="whitespace-nowrap">{entry.end_time ? new Date(entry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                              <td className="whitespace-nowrap">{fmtDate(entry.start_time)}</td>
+                              <td className={isSun ? 'text-warning font-bold' : ''}>{fmtDay(entry.start_time)}</td>
+                              <td>{isEntryInternal ? '—' : ((entry.clients as any)?.name || '—')}</td>
+                              <td className="text-amber-500 font-medium">{isEntryInternal ? ((entry.clients as any)?.name || '').replace(/[📋🔧🚗📚]\s*/g, '') : '—'}</td>
+                              <td className="whitespace-nowrap">{fmtTime(entry.start_time)}</td>
+                              <td className="whitespace-nowrap">{entry.end_time ? fmtTime(entry.end_time) : '—'}</td>
                               <td>{hrs.toFixed(1)}h</td>
                               <td className="text-xs text-base-content/70 max-w-[200px]">{entry.notes || <span className="text-base-content/30 italic">No notes</span>}</td>
                               <td>{flags.length > 0 ? flags.join(' ') : '✅'}</td>
+                              <td className="flex gap-1">
+                                <button className="btn btn-ghost btn-xs text-info" onClick={() => openEdit(entry)} title="Edit entry">
+                                  <Pencil size={12} />
+                                </button>
+                                {deleteConfirm === entry.id ? (
+                                  <div className="flex gap-1">
+                                    <button className="btn btn-error btn-xs" onClick={() => deleteEntry(entry.id)}>Yes</button>
+                                    <button className="btn btn-ghost btn-xs" onClick={() => setDeleteConfirm(null)}>No</button>
+                                  </div>
+                                ) : (
+                                  <button className="btn btn-ghost btn-xs text-error" onClick={() => setDeleteConfirm(entry.id)} title="Delete entry">
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </td>
                             </tr>
                           );
                         })}
@@ -396,10 +472,54 @@ export const PayReport: React.FC = () => {
         );
       })}
 
-      {techs.length === 0 && (
+      {displayTechs.length === 0 && (
         <div className="text-center py-12 text-base-content/50">
           <Calendar size={48} className="mx-auto mb-3 opacity-30" />
           <p>No technicians found. Add techs in the Technicians page first.</p>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editEntry && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg">✏️ Edit Time Entry</h3>
+              <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setEditEntry(null)}><X size={18} /></button>
+            </div>
+            <div className="text-sm mb-3 text-base-content/70">
+              <strong>{(editEntry.profiles as any)?.name}</strong> — {(editEntry.clients as any)?.name || 'Unknown client'}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label text-xs">Start Date</label>
+                <input type="date" className="input input-bordered input-sm w-full" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="label text-xs">Start Time</label>
+                <input type="time" className="input input-bordered input-sm w-full" value={editStart} onChange={e => setEditStart(e.target.value)} />
+              </div>
+              <div>
+                <label className="label text-xs">End Date</label>
+                <input type="date" className="input input-bordered input-sm w-full" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="label text-xs">End Time</label>
+                <input type="time" className="input input-bordered input-sm w-full" value={editEnd} onChange={e => setEditEnd(e.target.value)} />
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="label text-xs">Notes</label>
+              <textarea className="textarea textarea-bordered w-full" rows={3} value={editNotes} onChange={e => setEditNotes(e.target.value)} />
+            </div>
+            <div className="modal-action">
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditEntry(null)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={saveEdit} disabled={saving}>
+                <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setEditEntry(null)} />
         </div>
       )}
     </div>
