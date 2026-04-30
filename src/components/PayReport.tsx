@@ -3,6 +3,7 @@ import { DollarSign, Download, Calendar, MapPin } from 'lucide-react';
 import { Profile, TimeEntry } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatDuration, calcHours, getWeeksInMonth } from '../utils/helpers';
+import * as XLSX from 'xlsx';
 
 
 export const PayReport: React.FC = () => {
@@ -85,52 +86,62 @@ export const PayReport: React.FC = () => {
   }
 
   function exportReport() {
-    const lines: string[] = [];
-    const esc = (v: any) => {
-      const s = String(v ?? '');
-      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
-    };
+    const wb = XLSX.utils.book_new();
 
-    // --- Summary Section ---
-    lines.push('PAY REPORT SUMMARY');
-    lines.push(`Month:,${monthNames[month]} ${year}`);
-    lines.push('');
-    lines.push(['Technician','Email','Hourly Rate','Regular Hours','OT Hours (1.5x)','Sunday Hours (2x)','Total Hours','Regular Pay','OT Pay','Sunday Pay','Total Pay','GPS Missing','Distance > 1km','Short Visit','Total Flags'].join(','));
-    
+    // ========== TAB 1: Summary ==========
+    const summaryRows: any[][] = [];
+    summaryRows.push(['PAY REPORT SUMMARY']);
+    summaryRows.push([`Month: ${monthNames[month]} ${year}`]);
+    summaryRows.push([]);
+    summaryRows.push(['Technician','Email','Hourly Rate (R)','Regular Hours','OT Hours (1.5x)','Sunday Hours (2x)','Total Hours','Regular Pay (R)','OT Pay (R)','Sunday Pay (R)','Total Pay (R)','GPS Missing','Distance > 1km','Short Visit','Total Flags']);
+
+    let tReg = 0, tOT = 0, tSun = 0, tTotalHrs = 0, tPay = 0;
     techs.forEach(t => {
       const d = getTechData(t.id);
       const rate = Number(t.hourly_rate);
       const regPay = d.regularHours * rate;
       const otPay = d.overtimeHours * rate * 1.5;
       const sunPay = d.sundayHours * rate * 2;
-      lines.push([
-        esc(t.name), esc(t.email), rate.toFixed(2),
-        d.regularHours.toFixed(2), d.overtimeHours.toFixed(2), d.sundayHours.toFixed(2), d.totalHours.toFixed(2),
-        regPay.toFixed(2), otPay.toFixed(2), sunPay.toFixed(2), (regPay + otPay + sunPay).toFixed(2),
+      const totalPay = regPay + otPay + sunPay;
+      tReg += d.regularHours; tOT += d.overtimeHours; tSun += d.sundayHours;
+      tTotalHrs += d.totalHours; tPay += totalPay;
+      summaryRows.push([
+        t.name, t.email, Number(rate.toFixed(2)),
+        Number(d.regularHours.toFixed(2)), Number(d.overtimeHours.toFixed(2)), Number(d.sundayHours.toFixed(2)), Number(d.totalHours.toFixed(2)),
+        Number(regPay.toFixed(2)), Number(otPay.toFixed(2)), Number(sunPay.toFixed(2)), Number(totalPay.toFixed(2)),
         d.gpsFlags, d.distanceFlags, d.shortVisitFlags, d.totalFlags
-      ].join(','));
+      ]);
     });
+    summaryRows.push([]);
+    summaryRows.push(['TOTALS','','',Number(tReg.toFixed(2)),Number(tOT.toFixed(2)),Number(tSun.toFixed(2)),Number(tTotalHrs.toFixed(2)),'','','',Number(tPay.toFixed(2)),'','','','']);
 
-    // Totals row
-    let tReg = 0, tOT = 0, tSun = 0, tPay = 0;
-    techs.forEach(t => {
-      const d = getTechData(t.id);
-      const rate = Number(t.hourly_rate);
-      tReg += d.regularHours;
-      tOT += d.overtimeHours;
-      tSun += d.sundayHours;
-      tPay += (d.regularHours * rate) + (d.overtimeHours * rate * 1.5) + (d.sundayHours * rate * 2);
-    });
-    lines.push(['TOTALS','','',tReg.toFixed(2),tOT.toFixed(2),tSun.toFixed(2),(tReg+tOT+tSun).toFixed(2),'','','',tPay.toFixed(2),'','','',''].join(','));
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryRows);
+    ws1['!cols'] = [
+      { wch: 20 }, // Technician
+      { wch: 28 }, // Email
+      { wch: 14 }, // Hourly Rate
+      { wch: 14 }, // Regular Hours
+      { wch: 16 }, // OT Hours
+      { wch: 18 }, // Sunday Hours
+      { wch: 14 }, // Total Hours
+      { wch: 16 }, // Regular Pay
+      { wch: 14 }, // OT Pay
+      { wch: 16 }, // Sunday Pay
+      { wch: 16 }, // Total Pay
+      { wch: 14 }, // GPS Missing
+      { wch: 16 }, // Distance
+      { wch: 14 }, // Short Visit
+      { wch: 14 }, // Total Flags
+    ];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
 
-    // Blank separator
-    lines.push('');
-    lines.push('');
+    // ========== TAB 2: Detailed Entries ==========
+    const detailRows: any[][] = [];
+    detailRows.push(['DETAILED TIME ENTRIES']);
+    detailRows.push([`Month: ${monthNames[month]} ${year}`]);
+    detailRows.push([]);
+    detailRows.push(['Technician','Client','Activity','Account #','Date','Day','Clock In','Clock Out','Hours','Sunday','Notes','GPS Missing','Distance > 1km','Short Visit']);
 
-    // --- Detailed Entries Section ---
-    lines.push('DETAILED ENTRIES');
-    lines.push(['Technician','Client','Activity','Account #','Date','Day','Clock In','Clock Out','Hours','Sunday','Notes','GPS Missing','Distance > 1km','Short Visit'].join(','));
-    
     entries.forEach(e => {
       const techName = (e.profiles as any)?.name || 'Unknown';
       const isInternal = (e.clients as any)?.service_type === 'INTERNAL';
@@ -142,27 +153,47 @@ export const PayReport: React.FC = () => {
       const dayName = entryDate.toLocaleDateString('en-US', { weekday: 'short' });
       const clockIn = entryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const clockOut = e.end_time ? new Date(e.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-      const hrs = calcHours(e.start_time, e.end_time).toFixed(2);
+      const hrs = Number(calcHours(e.start_time, e.end_time).toFixed(2));
       const isSun = isSunday(e.start_time) ? 'YES' : '';
       const notes = (e.notes || '').replace(/\n/g, ' ');
       const gpsMissing = isInternal ? '' : ((e.start_lat == null || e.stop_lat == null) ? 'YES' : '');
-      const distFlag = isInternal ? '' : ((e.distance_km != null && e.distance_km > 1) ? 'YES (' + e.distance_km.toFixed(2) + 'km)' : '');
+      const distFlag = isInternal ? '' : ((e.distance_km != null && e.distance_km > 1) ? `YES (${e.distance_km.toFixed(2)}km)` : '');
       const durMin = e.end_time ? (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000 : 999;
-      const shortFlag = isInternal ? '' : (durMin < 10 ? 'YES (' + Math.round(durMin) + 'min)' : '');
-      
-      lines.push([
-        esc(techName), esc(clientName), esc(activityName), esc(acctNum),
-        date, dayName, clockIn, clockOut, hrs, isSun, esc(notes),
-        gpsMissing, esc(distFlag), esc(shortFlag)
-      ].join(','));
+      const shortFlag = isInternal ? '' : (durMin < 10 ? `YES (${Math.round(durMin)}min)` : '');
+
+      detailRows.push([
+        techName, clientName, activityName, acctNum,
+        date, dayName, clockIn, clockOut, hrs, isSun, notes,
+        gpsMissing, distFlag, shortFlag
+      ]);
     });
 
-    const csv = lines.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const ws2 = XLSX.utils.aoa_to_sheet(detailRows);
+    ws2['!cols'] = [
+      { wch: 18 }, // Technician
+      { wch: 24 }, // Client
+      { wch: 22 }, // Activity
+      { wch: 14 }, // Account #
+      { wch: 14 }, // Date
+      { wch: 8 },  // Day
+      { wch: 12 }, // Clock In
+      { wch: 12 }, // Clock Out
+      { wch: 10 }, // Hours
+      { wch: 10 }, // Sunday
+      { wch: 30 }, // Notes
+      { wch: 14 }, // GPS Missing
+      { wch: 18 }, // Distance
+      { wch: 16 }, // Short Visit
+    ];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Detailed Entries');
+
+    // Generate and download
+    const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pay-report-${monthNames[month]}-${year}.csv`;
+    a.download = `pay-report-${monthNames[month]}-${year}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
