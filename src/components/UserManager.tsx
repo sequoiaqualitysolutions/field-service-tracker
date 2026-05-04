@@ -93,6 +93,7 @@ export const UserManager: React.FC = () => {
           role: form.role,
           hourly_rate: parseFloat(form.hourly_rate),
           google_calendar_id: form.google_calendar_id || null,
+          ...(form.password ? { password: form.password } : {}),
         }),
       });
       const data = await res.json();
@@ -291,10 +292,8 @@ export const UserManager: React.FC = () => {
                 value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               <input className="input input-bordered w-full" placeholder="Email Address"
                 value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} disabled={!!editing} />
-              {!editing && (
-                <input className="input input-bordered w-full" placeholder="Password (min 6 characters)" type="password"
-                  value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-              )}
+              <input className="input input-bordered w-full" placeholder={editing ? "New password (leave blank to keep current)" : "Password (min 6 characters)"} type="password"
+                value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
               <div className="grid grid-cols-2 gap-3">
                 <select className="select select-bordered w-full" value={form.role}
                   onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>

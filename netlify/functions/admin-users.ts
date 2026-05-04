@@ -72,12 +72,23 @@ export default async (req: Request, _context: Context) => {
 
   // UPDATE USER PROFILE
   if (req.method === 'PUT') {
-    const { id, name, role, hourly_rate, google_calendar_id } = body;
+    const { id, name, role, hourly_rate, google_calendar_id, password } = body;
     if (!id) {
       return new Response(JSON.stringify({ error: 'id is required' }), {
         status: 400,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Update password in Supabase Auth if provided
+    if (password) {
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, { password });
+      if (authError) {
+        return new Response(JSON.stringify({ error: 'Password update failed: ' + authError.message }), {
+          status: 400,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const updates: Record<string, unknown> = {};
