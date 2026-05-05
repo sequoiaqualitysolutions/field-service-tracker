@@ -305,7 +305,7 @@ export const ClientManager: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               className="input input-bordered input-sm flex-1"
-              placeholder="Published Google Sheet CSV URL..."
+              placeholder="Paste your Google Sheet link here..."
               value={sheetUrl}
               onChange={e => setSheetUrl(e.target.value)}
             />
@@ -328,10 +328,17 @@ export const ClientManager: React.FC = () => {
               </button>
             </div>
           </div>
-          <p className="text-xs text-base-content/50">
-            Publish your Google Sheet: File → Share → Publish to web → Select CSV → Publish. Paste the URL here.
-            <span className="ml-2 text-base-content/40">Auto-syncs every 24 hours</span>
-          </p>
+          <div className="text-xs text-base-content/50 space-y-1">
+            <p className="font-semibold text-base-content/70">How to connect your Google Sheet:</p>
+            <ol className="list-decimal list-inside space-y-0.5 ml-1">
+              <li>Open your Google Sheet</li>
+              <li>Click <strong>Share</strong> (top right)</li>
+              <li>Under "General access", change to <strong>"Anyone with the link"</strong> → <strong>Viewer</strong></li>
+              <li>Click <strong>Copy link</strong></li>
+              <li>Paste it above and click <strong>Save</strong> → then <strong>Sync Now</strong></li>
+            </ol>
+            <p className="text-base-content/40 mt-1">🔄 Auto-syncs every 24 hours at 2:00 AM SAST</p>
+          </div>
           {syncError && (
             <div className="alert alert-error py-2 text-sm">
               <AlertCircle size={14} />

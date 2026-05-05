@@ -190,30 +190,48 @@ export default async (req: Request, _context: Context) => {
       }, 400);
     }
 
-    const csvUrl = setting.value;
+    const rawUrl = setting.value.trim();
 
-    // 2. Fetch the CSV
+    // 2. Convert any Google Sheets URL to CSV export URL
+    //    Accepts: 
+    //    - Normal: https://docs.google.com/spreadsheets/d/{ID}/edit...
+    //    - Published: https://docs.google.com/spreadsheets/d/e/{ID}/pub?output=csv
+    //    - Export: https://docs.google.com/spreadsheets/d/{ID}/export?format=csv
+    //    - Direct CSV URL (already correct)
+    let csvUrl = rawUrl;
+
+    // Extract sheet ID from standard Google Sheets URLs
+    const sheetIdMatch = rawUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if (sheetIdMatch && !rawUrl.includes('/export?') && !rawUrl.includes('output=csv')) {
+      const sheetId = sheetIdMatch[1];
+      // Use gid=0 for first sheet tab by default
+      csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+    }
+
+    // 3. Fetch the CSV
     const csvRes = await fetch(csvUrl);
     if (!csvRes.ok) {
+      const errBody = await csvRes.text().catch(() => '');
       return jsonResponse({
-        error: `Failed to fetch Google Sheet CSV: ${csvRes.status} ${csvRes.statusText}`,
+        error: `Failed to fetch Google Sheet. Make sure the sheet is shared as "Anyone with the link can view". Status: ${csvRes.status}`,
+        detail: errBody.substring(0, 200),
         added: 0, updated: 0, skipped: 0, errors: 0, total: 0,
       }, 502);
     }
 
     const csvText = await csvRes.text();
 
-    // 3. Parse the CSV
+    // 4. Parse the CSV
     const parsed = parseSheetRows(csvText);
 
     if (parsed.length === 0) {
       return jsonResponse({
-        message: 'No valid rows found in the Google Sheet CSV.',
+        message: 'No valid rows found. Make sure the Google Sheet has the expected columns (Customer full name, Phone numbers, Email, etc.) starting at row 4.',
         added: 0, updated: 0, skipped: 0, errors: 0, total: 0,
       });
     }
 
-    // 4. Sync each row into the clients table
+    // 5. Sync each row into the clients table
     let added = 0;
     let updated = 0;
     let skipped = 0;
