@@ -262,7 +262,7 @@ export const UserManager: React.FC = () => {
                 <span className={`badge badge-sm ${u.role === 'admin' ? 'badge-secondary' : u.role === 'team_leader' ? 'badge-accent' : 'badge-primary'}`}>
                   {u.role === 'admin' ? <><Shield size={10} /> Admin</> : u.role === 'team_leader' ? <><Users size={10} /> Team Leader</> : <><Wrench size={10} /> Tech</>}
                 </span>
-                <span className="text-xs text-base-content/60">${Number(u.hourly_rate).toFixed(2)}/hr</span>
+                <span className="text-xs text-base-content/60">R{Number(u.hourly_rate).toFixed(2)}/hr</span>
               </div>
               {u.google_calendar_id && (
                 <p className="text-[10px] text-base-content/40 mt-1 truncate" title={u.google_calendar_id}>📅 Calendar linked</p>
@@ -347,7 +347,7 @@ export const UserManager: React.FC = () => {
                     • <strong>name</strong> and <strong>email</strong> are required<br />
                     • <strong>password</strong> defaults to "TempPass123!" if blank (techs can change later)<br />
                     • <strong>role</strong> options: tech, team_leader, admin (defaults to "tech")<br />
-                    • <strong>hourly_rate</strong> defaults to $25.00 if blank
+                    • <strong>hourly_rate</strong> defaults to R25.00 if blank
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -389,7 +389,7 @@ export const UserManager: React.FC = () => {
                           <td>{r.name}</td>
                           <td className="font-mono text-xs">{r.email}</td>
                           <td><span className={`badge badge-xs ${r.role === 'admin' ? 'badge-secondary' : r.role === 'team_leader' ? 'badge-accent' : 'badge-primary'}`}>{r.role === 'team_leader' ? 'leader' : r.role}</span></td>
-                          <td>${parseFloat(r.hourly_rate || '25').toFixed(2)}</td>
+                          <td>R{parseFloat(r.hourly_rate || '25').toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
