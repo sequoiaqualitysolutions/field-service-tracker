@@ -11,6 +11,8 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { PayReport } from './components/PayReport';
 import { ClientManager } from './components/ClientManager';
 import { UserManager } from './components/UserManager';
+import { PortalLanding } from './components/PortalLanding';
+import { SQSAdminDashboard } from './components/SQSAdminDashboard';
 
 export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -19,6 +21,7 @@ export default function App() {
   const [preselectedClientId, setPreselectedClientId] = useState<number | null>(null);
   const [gpsData, setGpsData] = useState<{ startCoords: { lat: number; lng: number } | null; stopCoords: { lat: number; lng: number } | null }>({ startCoords: null, stopCoords: null });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [path] = useState(window.location.pathname);
 
   useEffect(() => {
     checkSession();
@@ -81,6 +84,39 @@ export default function App() {
     setSidebarOpen(false);
   }
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setProfile(null);
+    window.location.href = '/';
+  }
+
+  // === PATH-BASED ROUTING ===
+
+  // Landing page at "/" — always public
+  if (path === '/') {
+    return <PortalLanding />;
+  }
+
+  // SQS Admin Dashboard
+  if (path.startsWith('/sqs-admin')) {
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-base-300">
+          <span className="loading loading-spinner loading-lg text-primary" />
+        </div>
+      );
+    }
+    if (!profile) {
+      return <LoginPage onLogin={handleLogin} />;
+    }
+    if (!profile.is_platform_admin) {
+      window.location.href = '/login';
+      return null;
+    }
+    return <SQSAdminDashboard profile={profile} onLogout={handleLogout} />;
+  }
+
+  // Client app (at /login or any other path)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-300">

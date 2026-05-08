@@ -5,6 +5,7 @@ export interface Profile {
   role: 'admin' | 'team_leader' | 'tech';
   hourly_rate: number;
   google_calendar_id?: string;
+  is_platform_admin?: boolean;
   created_at?: string;
 }
 
@@ -82,4 +83,25 @@ export interface WeekInfo {
   startDay: number;
   endDay: number;
   label: string;
+}
+
+export interface SQSClient {
+  id: string;
+  company_name: string;
+  display_name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  site_url: string | null;
+  status: 'active' | 'inactive' | 'trial' | 'suspended';
+  pricing_tier: 'standard' | 'growth' | 'enterprise' | 'custom';
+  monthly_rate: number;
+  billing_start_date: string | null;
+  billing_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Live stats (populated by API)
+  user_count?: number;
+  hours_this_month?: number;
+  flags_this_month?: number;
 }
