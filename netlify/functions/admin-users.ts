@@ -72,7 +72,7 @@ export default async (req: Request, _context: Context) => {
 
   // UPDATE USER PROFILE
   if (req.method === 'PUT') {
-    const { id, name, role, hourly_rate, google_calendar_id, password } = body;
+    const { id, name, role, hourly_rate, google_calendar_id, password, email } = body;
     if (!id) {
       return new Response(JSON.stringify({ error: 'id is required' }), {
         status: 400,
@@ -80,15 +80,24 @@ export default async (req: Request, _context: Context) => {
       });
     }
 
-    // Update password in Supabase Auth if provided
-    if (password) {
-      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, { password });
+    // Update auth fields (email and/or password) in Supabase Auth if provided
+    const authUpdates: Record<string, string> = {};
+    if (password) authUpdates.password = password;
+    if (email) authUpdates.email = email;
+
+    if (Object.keys(authUpdates).length > 0) {
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, authUpdates);
       if (authError) {
-        return new Response(JSON.stringify({ error: 'Password update failed: ' + authError.message }), {
+        return new Response(JSON.stringify({ error: 'Auth update failed: ' + authError.message }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }
+    }
+
+    // Also update email in profiles table if changed
+    if (email) {
+      await supabaseAdmin.from('profiles').update({ email }).eq('id', id);
     }
 
     const updates: Record<string, unknown> = {};
