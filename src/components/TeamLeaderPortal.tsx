@@ -152,7 +152,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     setGpsStatus('Checking status...');
     setStopCoords(null);
 
-    // Prevent double session
+    // Prevent double session — check BOTH team_sessions AND time_entries for leader
     const { data: existing } = await supabase
       .from('team_sessions')
       .select('id, clients(name)')
@@ -163,6 +163,22 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     if (existing && existing.length > 0) {
       const clientName = (existing[0].clients as any)?.name || 'another client';
       setGpsStatus(`⚠️ Already clocked in at ${clientName}. Clock out first.`);
+      setLoading(false);
+      await loadData();
+      return;
+    }
+
+    // Also check if leader has a stale time_entry without a team_session (prevents stuck states)
+    const { data: leaderOpenEntries } = await supabase
+      .from('time_entries')
+      .select('id, clients(name)')
+      .eq('tech_id', profile.id)
+      .is('end_time', null)
+      .limit(1);
+
+    if (leaderOpenEntries && leaderOpenEntries.length > 0) {
+      const clientName = (leaderOpenEntries[0].clients as any)?.name || 'another client';
+      setGpsStatus(`⚠️ You have an open time entry at ${clientName}. Please clock out first.`);
       setLoading(false);
       await loadData();
       return;
@@ -204,10 +220,21 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
       return;
     }
 
-    // Filter out techs who are already clocked in elsewhere
-    const availableSelected = selectedTechs.filter(id => !busyTechs[id]);
+    // Real-time DB check: find which selected techs are ACTUALLY busy right now
+    // (not relying on potentially stale busyTechs state)
+    const allCandidates = [...selectedTechs];
+    let actuallyBusy: Set<string> = new Set();
+    if (allCandidates.length > 0) {
+      const { data: busyNow } = await supabase
+        .from('time_entries')
+        .select('tech_id')
+        .in('tech_id', allCandidates)
+        .is('end_time', null);
+      (busyNow || []).forEach((e: any) => actuallyBusy.add(e.tech_id));
+    }
+    const availableSelected = allCandidates.filter(id => !actuallyBusy.has(id));
 
-    // Create time entries for leader + all selected techs
+    // Create time entries for leader + all available selected techs
     const allPeople = [profile.id, ...availableSelected];
     const entries = allPeople.map(personId => ({
       tech_id: personId,
@@ -358,11 +385,23 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
 
   async function handleAddTech(techId: string) {
     if (!activeSession) return;
-    // Check if tech is already clocked in
-    if (busyTechs[techId]) {
+    setLoading(true);
+
+    // Real-time DB check: verify tech is not already clocked in
+    const { data: openEntries } = await supabase
+      .from('time_entries')
+      .select('id, clients(name)')
+      .eq('tech_id', techId)
+      .is('end_time', null)
+      .limit(1);
+
+    if (openEntries && openEntries.length > 0) {
+      const clientName = (openEntries[0].clients as any)?.name || 'another account';
+      setGpsStatus(`⚠️ Tech is already clocked in at ${clientName}`);
+      setLoading(false);
+      await loadData();
       return;
     }
-    setLoading(true);
 
     const now = new Date().toISOString();
 
@@ -391,6 +430,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
 
     if (error) {
       console.error('Add tech error:', error);
+      setGpsStatus('Failed to add tech: ' + error.message);
     }
 
     setShowAddTech(false);
