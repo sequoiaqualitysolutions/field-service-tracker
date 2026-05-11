@@ -249,49 +249,64 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     setLoading(true);
     setGpsStatus('Acquiring stop GPS...');
 
-    let lat: number | null = null;
-    let lng: number | null = null;
-
     try {
-      const coords = await getCurrentGps();
-      lat = coords.lat;
-      lng = coords.lng;
-      setStopCoords(coords);
-      setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
-    } catch {
-      setGpsStatus('Stop GPS unavailable');
+      let lat: number | null = null;
+      let lng: number | null = null;
+
+      try {
+        const coords = await getCurrentGps();
+        lat = coords.lat;
+        lng = coords.lng;
+        setStopCoords(coords);
+        setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+      } catch {
+        setGpsStatus('Stop GPS unavailable');
+      }
+
+      const now = new Date().toISOString();
+
+      // Calculate distance
+      let distance: number | null = null;
+      if (activeSession.start_lat != null && activeSession.start_lng != null && lat != null && lng != null) {
+        distance = calcDistanceKm(activeSession.start_lat, activeSession.start_lng, lat, lng);
+      }
+
+      // Update session
+      const { error: sessionErr } = await supabase.from('team_sessions').update({
+        end_time: now,
+        stop_lat: lat,
+        stop_lng: lng,
+        distance_km: distance,
+      }).eq('id', activeSession.id);
+
+      if (sessionErr) {
+        console.error('Session update error:', sessionErr);
+        setGpsStatus('⚠️ Session close had an error — still closing entries...');
+      }
+
+      // Update ALL open entries in this session
+      const { error: entriesErr } = await supabase.from('time_entries').update({
+        end_time: now,
+        stop_lat: lat,
+        stop_lng: lng,
+        distance_km: distance,
+        notes: sessionNotes || undefined,
+      }).eq('session_id', activeSession.id).is('end_time', null);
+
+      if (entriesErr) {
+        console.error('Entries update error:', entriesErr);
+      }
+
+      setActiveSession(null);
+      setSessionEntries([]);
+      setElapsed('00:00:00');
+      await loadData();
+    } catch (err) {
+      console.error('Clock-out error:', err);
+      setGpsStatus('⚠️ Clock-out failed — please try again');
+    } finally {
+      setLoading(false);
     }
-
-    const now = new Date().toISOString();
-
-    // Calculate distance
-    let distance: number | null = null;
-    if (activeSession.start_lat != null && activeSession.start_lng != null && lat != null && lng != null) {
-      distance = calcDistanceKm(activeSession.start_lat, activeSession.start_lng, lat, lng);
-    }
-
-    // Update session
-    await supabase.from('team_sessions').update({
-      end_time: now,
-      stop_lat: lat,
-      stop_lng: lng,
-      distance_km: distance,
-    }).eq('id', activeSession.id);
-
-    // Update ALL open entries in this session
-    await supabase.from('time_entries').update({
-      end_time: now,
-      stop_lat: lat,
-      stop_lng: lng,
-      distance_km: distance,
-      notes: sessionNotes || undefined,
-    }).eq('session_id', activeSession.id).is('end_time', null);
-
-    setActiveSession(null);
-    setSessionEntries([]);
-    setElapsed('00:00:00');
-    await loadData();
-    setLoading(false);
   }
 
   async function handleClockOutSingleTech(entryId: number) {
@@ -299,40 +314,46 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     setLoading(true);
     setGpsStatus('Acquiring stop GPS...');
 
-    let lat: number | null = null;
-    let lng: number | null = null;
-
     try {
-      const coords = await getCurrentGps();
-      lat = coords.lat;
-      lng = coords.lng;
-      setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
-    } catch {
-      setGpsStatus('Stop GPS unavailable');
+      let lat: number | null = null;
+      let lng: number | null = null;
+
+      try {
+        const coords = await getCurrentGps();
+        lat = coords.lat;
+        lng = coords.lng;
+        setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+      } catch {
+        setGpsStatus('Stop GPS unavailable');
+      }
+
+      const now = new Date().toISOString();
+
+      // Calculate distance from session start
+      let distance: number | null = null;
+      if (activeSession.start_lat != null && activeSession.start_lng != null && lat != null && lng != null) {
+        distance = calcDistanceKm(activeSession.start_lat, activeSession.start_lng, lat, lng);
+      }
+
+      const { error } = await supabase.from('time_entries').update({
+        end_time: now,
+        stop_lat: lat,
+        stop_lng: lng,
+        distance_km: distance,
+      }).eq('id', entryId);
+
+      if (error) {
+        console.error('Individual clock-out error:', error);
+        setGpsStatus('Failed to clock out: ' + error.message);
+      }
+
+      await loadData();
+    } catch (err) {
+      console.error('Clock-out error:', err);
+      setGpsStatus('⚠️ Clock-out failed — please try again');
+    } finally {
+      setLoading(false);
     }
-
-    const now = new Date().toISOString();
-
-    // Calculate distance from session start
-    let distance: number | null = null;
-    if (activeSession.start_lat != null && activeSession.start_lng != null && lat != null && lng != null) {
-      distance = calcDistanceKm(activeSession.start_lat, activeSession.start_lng, lat, lng);
-    }
-
-    const { error } = await supabase.from('time_entries').update({
-      end_time: now,
-      stop_lat: lat,
-      stop_lng: lng,
-      distance_km: distance,
-    }).eq('id', entryId);
-
-    if (error) {
-      console.error('Individual clock-out error:', error);
-      setGpsStatus('Failed to clock out: ' + error.message);
-    }
-
-    await loadData();
-    setLoading(false);
   }
 
   async function handleAddTech(techId: string) {

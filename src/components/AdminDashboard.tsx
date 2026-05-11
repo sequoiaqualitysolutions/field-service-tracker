@@ -52,6 +52,57 @@ export const AdminDashboard: React.FC = () => {
     setActiveSessions(activeData || []);
   }
 
+  async function handleForceClockOut(entry: any) {
+    if (!confirm(`Force clock out ${entry.profiles?.name || 'Unknown'} from ${entry.clients?.name || 'Unknown'}?`)) return;
+
+    const now = new Date().toISOString();
+
+    // Close the time entry
+    await supabase.from('time_entries').update({
+      end_time: now,
+      notes: (entry.notes ? entry.notes + ' | ' : '') + '[Admin force clock-out]',
+    }).eq('id', entry.id);
+
+    // If this entry has a session_id, check if all entries in that session are now closed
+    if (entry.session_id) {
+      const { data: openEntries } = await supabase
+        .from('time_entries')
+        .select('id')
+        .eq('session_id', entry.session_id)
+        .is('end_time', null);
+
+      // If no more open entries, close the team session too
+      if (!openEntries || openEntries.length === 0) {
+        await supabase.from('team_sessions').update({
+          end_time: now,
+        }).eq('id', entry.session_id);
+      }
+    }
+
+    await loadData();
+  }
+
+  async function handleForceClockOutAll() {
+    if (!confirm(`Force clock out ALL ${activeSessions.length} active sessions? This cannot be undone.`)) return;
+
+    const now = new Date().toISOString();
+
+    // Close all open time entries
+    for (const entry of activeSessions) {
+      await supabase.from('time_entries').update({
+        end_time: now,
+        notes: (entry.notes ? entry.notes + ' | ' : '') + '[Admin force clock-out]',
+      }).eq('id', entry.id);
+    }
+
+    // Close all open team sessions
+    await supabase.from('team_sessions').update({
+      end_time: now,
+    }).is('end_time', null);
+
+    await loadData();
+  }
+
   const weeks = getWeeksInMonth(year, month);
 
   function getWeeklyHours(techId: string): number[] {
@@ -271,10 +322,20 @@ export const AdminDashboard: React.FC = () => {
       {/* 🟢 Active Sessions - Who's On The Clock */}
       <div className="card bg-base-200">
         <div className="card-body p-4">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
-            <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
-            Active Sessions ({activeSessions.length} on the clock)
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
+              Active Sessions ({activeSessions.length} on the clock)
+            </h3>
+            {activeSessions.length > 0 && (
+              <button
+                className="btn btn-xs btn-error"
+                onClick={handleForceClockOutAll}
+              >
+                ⏹ Force Clock Out All
+              </button>
+            )}
+          </div>
           {activeSessions.length === 0 ? (
             <p className="text-sm text-base-content/50 text-center py-4">No one is currently clocked in</p>
           ) : (
@@ -288,6 +349,7 @@ export const AdminDashboard: React.FC = () => {
                     <th>Notes</th>
                     <th>Started</th>
                     <th>Duration</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -314,6 +376,15 @@ export const AdminDashboard: React.FC = () => {
                           <span className={`badge badge-sm ${hours >= 9 ? 'badge-error' : 'badge-success'}`}>
                             {duration}
                           </span>
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-xs btn-error btn-outline"
+                            onClick={() => handleForceClockOut(entry)}
+                            title="Force clock out"
+                          >
+                            ⏹ Kick
+                          </button>
                         </td>
                       </tr>
                     );

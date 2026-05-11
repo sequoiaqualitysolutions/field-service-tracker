@@ -186,44 +186,50 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
     setLoading(true);
     setGpsStatus('Acquiring GPS position...');
 
-    let lat: number | null = null;
-    let lng: number | null = null;
-
     try {
-      const coords = await getCurrentGps();
-      lat = coords.lat;
-      lng = coords.lng;
-      setStopCoords(coords);
-      setGpsStatus(`Stop GPS acquired ✓  (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
-    } catch {
-      setGpsStatus('Stop GPS unavailable');
-    }
+      let lat: number | null = null;
+      let lng: number | null = null;
 
-    // Calculate straight-line distance between clock-in and clock-out
-    let distance: number | null = null;
-    if (activeEntry.start_lat != null && activeEntry.start_lng != null && lat != null && lng != null) {
-      distance = calcDistanceKm(activeEntry.start_lat, activeEntry.start_lng, lat, lng);
-    }
+      try {
+        const coords = await getCurrentGps();
+        lat = coords.lat;
+        lng = coords.lng;
+        setStopCoords(coords);
+        setGpsStatus(`Stop GPS acquired ✓  (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+      } catch {
+        setGpsStatus('Stop GPS unavailable');
+      }
 
-    const { error } = await supabase
-      .from('time_entries')
-      .update({
-        end_time: new Date().toISOString(),
-        stop_lat: lat,
-        stop_lng: lng,
-        distance_km: distance,
-        notes: sessionNotes || activeEntry.notes,
-      })
-      .eq('id', activeEntry.id);
+      // Calculate straight-line distance between clock-in and clock-out
+      let distance: number | null = null;
+      if (activeEntry.start_lat != null && activeEntry.start_lng != null && lat != null && lng != null) {
+        distance = calcDistanceKm(activeEntry.start_lat, activeEntry.start_lng, lat, lng);
+      }
 
-    if (error) {
-      console.error('Failed to stop job:', error);
-    } else {
-      setActiveEntry(null);
-      setElapsed('00:00:00');
-      await loadData();
+      const { error } = await supabase
+        .from('time_entries')
+        .update({
+          end_time: new Date().toISOString(),
+          stop_lat: lat,
+          stop_lng: lng,
+          distance_km: distance,
+          notes: sessionNotes || activeEntry.notes,
+        })
+        .eq('id', activeEntry.id);
+
+      if (error) {
+        console.error('Failed to stop job:', error);
+      } else {
+        setActiveEntry(null);
+        setElapsed('00:00:00');
+        await loadData();
+      }
+    } catch (err) {
+      console.error('Clock-out error:', err);
+      setGpsStatus('⚠️ Clock-out failed — please try again');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   const todayTotal = todayEntries.reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0);
