@@ -114,8 +114,8 @@ CREATE POLICY "Techs see own entries, admins see all" ON public.time_entries
   FOR SELECT TO authenticated USING (tech_id = auth.uid() OR public.is_admin());
 CREATE POLICY "Techs can insert own entries" ON public.time_entries
   FOR INSERT TO authenticated WITH CHECK (tech_id = auth.uid());
-CREATE POLICY "Techs can update own entries" ON public.time_entries
-  FOR UPDATE TO authenticated USING (tech_id = auth.uid());
+CREATE POLICY "Techs can update own entries, admins can update all" ON public.time_entries
+  FOR UPDATE TO authenticated USING (tech_id = auth.uid() OR public.is_admin());
 CREATE POLICY "Admins can delete entries" ON public.time_entries
   FOR DELETE TO authenticated USING (public.is_admin());
 
