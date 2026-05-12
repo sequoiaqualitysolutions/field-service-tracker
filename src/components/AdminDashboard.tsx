@@ -3,6 +3,7 @@ import { BarChart3, AlertTriangle, Users, Clock, TrendingUp, MapPin } from 'luci
 import { Profile, TimeEntry, WeekInfo } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatDuration, getWeeksInMonth, calcHours } from '../utils/helpers';
+import { FlaggedGpsMap } from './FlaggedGpsMap';
 import Chart from 'chart.js/auto';
 
 export const AdminDashboard: React.FC = () => {
@@ -469,6 +470,9 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Flagged GPS Map */}
+      <FlaggedGpsMap entries={entries} selectedTech={selectedTech} />
 
       {/* Tech Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
