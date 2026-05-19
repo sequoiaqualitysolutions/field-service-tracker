@@ -42,16 +42,26 @@ export const PayReport: React.FC = () => {
     const startDate = new Date(year, month, 1).toISOString();
     const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
 
-    const { data: entryRows } = await supabase
-      .from('time_entries')
-      .select('*, clients(name, account_number, service_type), profiles!time_entries_tech_id_fkey(name)')
-      .gte('start_time', startDate)
-      .lte('start_time', endDate)
-      .not('end_time', 'is', null)
-      .order('start_time')
-      .range(0, 4999);
+    // Paginated fetch — Supabase caps at 1000 rows per request
+    let allEntries: any[] = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data: batch } = await supabase
+        .from('time_entries')
+        .select('*, clients(name, account_number, service_type), profiles!time_entries_tech_id_fkey(name)')
+        .gte('start_time', startDate)
+        .lte('start_time', endDate)
+        .not('end_time', 'is', null)
+        .order('start_time')
+        .range(from, from + PAGE - 1);
+      const rows = batch || [];
+      allEntries = allEntries.concat(rows);
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
 
-    setEntries((entryRows || []) as unknown as TimeEntry[]);
+    setEntries(allEntries as unknown as TimeEntry[]);
   }
 
   const weeks = getWeeksInMonth(year, month);
