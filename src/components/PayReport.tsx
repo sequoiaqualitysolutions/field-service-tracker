@@ -48,7 +48,8 @@ export const PayReport: React.FC = () => {
       .gte('start_time', startDate)
       .lte('start_time', endDate)
       .not('end_time', 'is', null)
-      .order('start_time');
+      .order('start_time')
+      .range(0, 4999);
 
     setEntries((entryRows || []) as unknown as TimeEntry[]);
   }

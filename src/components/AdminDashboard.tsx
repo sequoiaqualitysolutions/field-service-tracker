@@ -40,7 +40,8 @@ export const AdminDashboard: React.FC = () => {
       .select('*, clients(name, account_number, service_type), profiles!time_entries_tech_id_fkey(name)')
       .gte('start_time', startDate)
       .lte('start_time', endDate)
-      .not('end_time', 'is', null);
+      .not('end_time', 'is', null)
+      .range(0, 4999);
 
     setEntries((entryRows || []) as unknown as TimeEntry[]);
 
