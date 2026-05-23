@@ -76,7 +76,7 @@ export interface CalendarEvent {
   matchedClient?: Client | null;
 }
 
-export type AppView = 'dashboard' | 'clients' | 'pay-report' | 'tech-portal' | 'user-management' | 'schedule' | 'team-leader-portal';
+export type AppView = 'dashboard' | 'clients' | 'pay-report' | 'tech-portal' | 'user-management' | 'schedule' | 'team-leader-portal' | 'route-planner';
 
 export interface WeekInfo {
   week: number;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut, CalendarDays, UserCheck, X } from 'lucide-react';
+import { LayoutDashboard, Briefcase, DollarSign, Clock, Users, LogOut, CalendarDays, UserCheck, X, Route } from 'lucide-react';
 import { AppView, Profile } from '../types';
 import { supabase } from '../lib/supabase';
 import { MapView } from './MapView';
@@ -26,6 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
       { view: 'pay-report', label: 'Pay Report', icon: <DollarSign size={18} /> },
       { view: 'user-management', label: 'Technicians', icon: <Users size={18} /> },
       { view: 'schedule', label: 'Schedule', icon: <CalendarDays size={18} /> },
+      { view: 'route-planner', label: 'Route Planner', icon: <Route size={18} /> },
       { view: 'tech-portal', label: 'Tech Portal', icon: <Clock size={18} /> },
     );
   }
@@ -34,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
     navItems.push(
       { view: 'team-leader-portal', label: 'Team Portal', icon: <UserCheck size={18} /> },
       { view: 'schedule', label: 'Schedule', icon: <CalendarDays size={18} /> },
+      { view: 'route-planner', label: 'Route Planner', icon: <Route size={18} /> },
       { view: 'tech-portal', label: 'My Timesheet', icon: <Clock size={18} /> },
     );
   }

@@ -13,6 +13,7 @@ import { ClientManager } from './components/ClientManager';
 import { UserManager } from './components/UserManager';
 import { PortalLanding } from './components/PortalLanding';
 import { SQSAdminDashboard } from './components/SQSAdminDashboard';
+import { RoutePlanner } from './components/RoutePlanner';
 
 export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -136,6 +137,7 @@ export default function App() {
       case 'pay-report': return profile?.role === 'admin' ? <PayReport /> : <AdminDashboard />;
       case 'user-management': return <UserManager />;
       case 'schedule': return <TechSchedule profile={profile!} onClockIn={handleScheduleClockIn} />;
+      case 'route-planner': return <RoutePlanner profile={profile!} />;
       case 'team-leader-portal': return <TeamLeaderPortal profile={profile!} onGpsUpdate={setGpsData} />;
       case 'tech-portal': return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} onGpsUpdate={setGpsData} />;
       default: return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} onGpsUpdate={setGpsData} />;
