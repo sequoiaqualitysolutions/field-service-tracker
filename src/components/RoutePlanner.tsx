@@ -60,11 +60,11 @@ let mapsLoaded = false;
 let mapsLoadPromise: Promise<void> | null = null;
 
 function loadGoogleMaps(): Promise<void> {
-  if (mapsLoaded && window.google?.maps) return Promise.resolve();
+  if (mapsLoaded && (window as any).google?.maps) return Promise.resolve();
   if (mapsLoadPromise) return mapsLoadPromise;
 
   mapsLoadPromise = new Promise((resolve, reject) => {
-    if (window.google?.maps) {
+    if ((window as any).google?.maps) {
       mapsLoaded = true;
       resolve();
       return;
@@ -119,12 +119,12 @@ async function getDistanceMatrix(
         destinations,
         travelMode: google.maps.TravelMode.DRIVING,
         drivingOptions: {
-          departureTime: new Date(), // use current traffic
+          departureTime: new Date(),
           trafficModel: google.maps.TrafficModel.BEST_GUESS,
         },
         unitSystem: google.maps.UnitSystem.METRIC,
       },
-      (response, status) => {
+      (response: google.maps.DistanceMatrixResponse | null, status: string) => {
         if (status === 'OK' && response) resolve(response);
         else reject(new Error(`Distance Matrix failed: ${status}`));
       },
