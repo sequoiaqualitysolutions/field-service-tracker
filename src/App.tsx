@@ -137,7 +137,7 @@ export default function App() {
       case 'pay-report': return profile?.role === 'admin' ? <PayReport /> : <AdminDashboard />;
       case 'user-management': return <UserManager />;
       case 'schedule': return <TechSchedule profile={profile!} onClockIn={handleScheduleClockIn} />;
-      case 'route-planner': return <RoutePlanner profile={profile!} />;
+      case 'route-planner': return profile?.is_platform_admin ? <RoutePlanner profile={profile!} /> : <AdminDashboard />;
       case 'team-leader-portal': return <TeamLeaderPortal profile={profile!} onGpsUpdate={setGpsData} />;
       case 'tech-portal': return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} onGpsUpdate={setGpsData} />;
       default: return <TechPortal profile={profile!} preselectedClientId={preselectedClientId} onClearPreselect={() => setPreselectedClientId(null)} onGpsUpdate={setGpsData} />;
