@@ -4,6 +4,24 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.SUPABASE_URL!;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// Helper: paginated fetch to avoid 1000-row cap
+async function fetchAllRows(supabase: any, table: string, select: string, filters: (q: any) => any) {
+  const all: any[] = [];
+  let from = 0;
+  const batchSize = 1000;
+  while (true) {
+    let query = supabase.from(table).select(select).range(from, from + batchSize - 1);
+    query = filters(query);
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < batchSize) break;
+    from += batchSize;
+  }
+  return all;
+}
+
 export default async (req: Request, context: Context) => {
   const supabase = createClient(supabaseUrl, serviceKey);
   const url = new URL(req.url);
@@ -29,24 +47,25 @@ export default async (req: Request, context: Context) => {
       
       // Monthly revenue
       const { data: clients } = await supabase.from('sqs_clients').select('monthly_rate').eq('status', 'active');
-      const monthlyRevenue = (clients || []).reduce((sum, c) => sum + Number(c.monthly_rate), 0);
+      const monthlyRevenue = (clients || []).reduce((sum: number, c: any) => sum + Number(c.monthly_rate), 0);
       
-      // Hours this month
+      // Hours this month (paginated)
       const now = new Date();
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const { data: entries } = await supabase.from('time_entries').select('start_time, end_time').not('end_time', 'is', null).gte('start_time', firstOfMonth);
+      const entries = await fetchAllRows(supabase, 'time_entries', 'start_time, end_time', (q: any) =>
+        q.not('end_time', 'is', null).gte('start_time', firstOfMonth).order('id', { ascending: true })
+      );
       let totalHours = 0;
-      (entries || []).forEach(e => {
+      entries.forEach((e: any) => {
         totalHours += (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 3600000;
       });
 
-      // Flags this month
+      // Flags this month (paginated)
       let flagCount = 0;
-      const { data: flagEntries } = await supabase.from('time_entries')
-        .select('start_time, end_time, distance_km, start_lat, clients!inner(service_type)')
-        .not('end_time', 'is', null)
-        .gte('start_time', firstOfMonth);
-      (flagEntries || []).forEach((e: any) => {
+      const flagEntries = await fetchAllRows(supabase, 'time_entries', 'start_time, end_time, distance_km, start_lat, clients!inner(service_type)', (q: any) =>
+        q.not('end_time', 'is', null).gte('start_time', firstOfMonth).order('id', { ascending: true })
+      );
+      flagEntries.forEach((e: any) => {
         if (e.clients?.service_type === 'INTERNAL') return;
         const mins = (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000;
         if (e.distance_km && e.distance_km > 1) flagCount++;
@@ -68,7 +87,7 @@ export default async (req: Request, context: Context) => {
       
       // Enrich with live user counts
       const { data: profiles } = await supabase.from('profiles').select('role').neq('is_platform_admin', true);
-      const enriched = (clientList || []).map(c => ({
+      const enriched = (clientList || []).map((c: any) => ({
         ...c,
         user_count: (profiles || []).length, // For now, all users belong to same DB
       }));
@@ -86,11 +105,15 @@ export default async (req: Request, context: Context) => {
       
       const now = new Date();
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const { data: entries } = await supabase.from('time_entries').select('start_time, end_time, distance_km, start_lat, clients!inner(service_type)').not('end_time', 'is', null).gte('start_time', firstOfMonth);
+      
+      // Paginated fetch for client detail
+      const entries = await fetchAllRows(supabase, 'time_entries', 'start_time, end_time, distance_km, start_lat, clients!inner(service_type)', (q: any) =>
+        q.not('end_time', 'is', null).gte('start_time', firstOfMonth).order('id', { ascending: true })
+      );
       
       let totalHours = 0;
       let flagCount = 0;
-      (entries || []).forEach((e: any) => {
+      entries.forEach((e: any) => {
         totalHours += (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 3600000;
         if (e.clients?.service_type === 'INTERNAL') return;
         const mins = (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000;
@@ -99,15 +122,17 @@ export default async (req: Request, context: Context) => {
         if (!e.start_lat) flagCount++;
       });
 
-      // Monthly hours for last 6 months (for chart)
+      // Monthly hours for last 6 months (paginated)
       const monthlyHours: { month: string; hours: number }[] = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const start = d.toISOString();
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString();
-        const { data: mEntries } = await supabase.from('time_entries').select('start_time, end_time').not('end_time', 'is', null).gte('start_time', start).lt('start_time', end);
+        const mEntries = await fetchAllRows(supabase, 'time_entries', 'start_time, end_time', (q: any) =>
+          q.not('end_time', 'is', null).gte('start_time', start).lt('start_time', end).order('id', { ascending: true })
+        );
         let mHours = 0;
-        (mEntries || []).forEach(e => {
+        mEntries.forEach((e: any) => {
           mHours += (new Date(e.end_time!).getTime() - new Date(e.start_time).getTime()) / 3600000;
         });
         monthlyHours.push({ month: d.toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' }), hours: Math.round(mHours * 10) / 10 });
@@ -117,9 +142,9 @@ export default async (req: Request, context: Context) => {
         ...client,
         user_count: (profiles || []).length,
         users_by_role: {
-          admin: (profiles || []).filter(p => p.role === 'admin').length,
-          team_leader: (profiles || []).filter(p => p.role === 'team_leader').length,
-          tech: (profiles || []).filter(p => p.role === 'tech').length,
+          admin: (profiles || []).filter((p: any) => p.role === 'admin').length,
+          team_leader: (profiles || []).filter((p: any) => p.role === 'team_leader').length,
+          tech: (profiles || []).filter((p: any) => p.role === 'tech').length,
         },
         hours_this_month: Math.round(totalHours * 10) / 10,
         flags_this_month: flagCount,
