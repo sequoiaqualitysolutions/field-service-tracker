@@ -21,7 +21,9 @@ export function formatDaySAST(iso: string): string {
 export function calcHours(start: string, end: string | null): number {
   const s = new Date(start).getTime();
   const e = end ? new Date(end).getTime() : Date.now();
-  return (e - s) / 3600000;
+  const hours = (e - s) / 3600000;
+  // Cap at 24h per entry — anything higher is bad data
+  return hours < 0 ? 0 : Math.min(hours, 24);
 }
 
 export function getCurrentGps(): Promise<{ lat: number; lng: number }> {

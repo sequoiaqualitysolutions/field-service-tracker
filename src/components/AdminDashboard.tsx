@@ -212,6 +212,7 @@ export const AdminDashboard: React.FC = () => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { left: 10, right: 20 } },
         plugins: {
           legend: { position: 'bottom', labels: { color: '#e0d6cc', usePointStyle: true, padding: 15, font: { family: 'Montserrat' } } },
           tooltip: {
@@ -248,6 +249,7 @@ export const AdminDashboard: React.FC = () => {
             },
           },
           x: {
+            offset: true,
             ticks: { color: '#e0d6cc', font: { family: 'Montserrat' } },
             grid: { color: '#1a1f26' },
           },
