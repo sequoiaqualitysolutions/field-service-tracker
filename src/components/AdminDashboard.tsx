@@ -240,7 +240,7 @@ export const AdminDashboard: React.FC = () => {
             },
             ticks: {
               color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= 45 ? '#ef4444' : '#e0d6cc',
-              callback: (v: number | string) => Number(v) === 45 ? '45h ⛔' : `${v}h`,
+              callback: (v: number | string) => Number(v) === 45 ? '45h ⛔' : `${Math.round(Number(v))}h`,
               font: (ctx: any) => ({ size: 10, family: 'Montserrat', weight: (ctx.tick?.value != null && ctx.tick.value === 45 ? 'bold' : 'normal') as any }),
             },
             grid: {
