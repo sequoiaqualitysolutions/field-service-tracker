@@ -141,19 +141,26 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
       return;
     }
 
-    setGpsStatus('Acquiring GPS position...');
+    // Check if selected client is an internal activity (skip GPS for internal)
+    const selectedClientObj = clients.find(c => c.id === selectedClient);
+    const isInternal = selectedClientObj?.service_type === 'INTERNAL';
 
     let lat: number | null = null;
     let lng: number | null = null;
 
-    try {
-      const coords = await getCurrentGps();
-      lat = coords.lat;
-      lng = coords.lng;
-      setStartCoords(coords);
-      setGpsStatus(`GPS acquired ✓  (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
-    } catch {
-      setGpsStatus('GPS unavailable — recording without location');
+    if (isInternal) {
+      setGpsStatus('Internal activity — GPS skipped');
+    } else {
+      setGpsStatus('Acquiring GPS position...');
+      try {
+        const coords = await getCurrentGps();
+        lat = coords.lat;
+        lng = coords.lng;
+        setStartCoords(coords);
+        setGpsStatus(`GPS acquired ✓  (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+      } catch {
+        setGpsStatus('GPS unavailable — recording without location');
+      }
     }
 
     const { error } = await supabase.from('time_entries').insert({
@@ -184,20 +191,27 @@ export const TechPortal: React.FC<TechPortalProps> = ({ profile, preselectedClie
   async function handleStop() {
     if (!activeEntry) return;
     setLoading(true);
-    setGpsStatus('Acquiring GPS position...');
+
+    // Check if this is an internal activity (skip GPS)
+    const isInternal = (activeEntry.clients as any)?.service_type === 'INTERNAL';
 
     try {
       let lat: number | null = null;
       let lng: number | null = null;
 
-      try {
-        const coords = await getCurrentGps();
-        lat = coords.lat;
-        lng = coords.lng;
-        setStopCoords(coords);
-        setGpsStatus(`Stop GPS acquired ✓  (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
-      } catch {
-        setGpsStatus('Stop GPS unavailable');
+      if (isInternal) {
+        setGpsStatus('Internal activity — GPS skipped');
+      } else {
+        setGpsStatus('Acquiring GPS position...');
+        try {
+          const coords = await getCurrentGps();
+          lat = coords.lat;
+          lng = coords.lng;
+          setStopCoords(coords);
+          setGpsStatus(`Stop GPS acquired ✓  (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+        } catch {
+          setGpsStatus('Stop GPS unavailable');
+        }
       }
 
       // Calculate straight-line distance between clock-in and clock-out

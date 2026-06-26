@@ -26,16 +26,39 @@ export function calcHours(start: string, end: string | null): number {
   return hours < 0 ? 0 : Math.min(hours, 24);
 }
 
-export function getCurrentGps(): Promise<{ lat: number; lng: number }> {
+export function getCurrentGps(timeoutMs = 10000): Promise<{ lat: number; lng: number }> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation not supported'));
       return;
     }
+
+    // Manual timeout — some mobile browsers ignore the GPS timeout option entirely,
+    // causing the promise to hang forever and freezing the UI
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('GPS timeout'));
+      }
+    }, timeoutMs);
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 15000 }
+      (pos) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        }
+      },
+      (err) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          reject(err);
+        }
+      },
+      { enableHighAccuracy: true, timeout: timeoutMs }
     );
   });
 }

@@ -116,7 +116,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     // Get active session
     const { data: activeSessions } = await supabase
       .from('team_sessions')
-      .select('*, clients(name, account_number)')
+      .select('*, clients(name, account_number, service_type)')
       .eq('leader_id', profile.id)
       .is('end_time', null)
       .limit(1);
@@ -184,19 +184,26 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
       return;
     }
 
-    setGpsStatus('Acquiring GPS position...');
+    // Check if selected client is an internal activity (skip GPS for internal)
+    const selectedClientObj = clients.find(c => c.id === selectedClient);
+    const isInternal = selectedClientObj?.service_type === 'INTERNAL';
 
     let lat: number | null = null;
     let lng: number | null = null;
 
-    try {
-      const coords = await getCurrentGps();
-      lat = coords.lat;
-      lng = coords.lng;
-      setStartCoords(coords);
-      setGpsStatus(`GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
-    } catch {
-      setGpsStatus('GPS unavailable — recording without location');
+    if (isInternal) {
+      setGpsStatus('Internal activity — GPS skipped');
+    } else {
+      setGpsStatus('Acquiring GPS position...');
+      try {
+        const coords = await getCurrentGps();
+        lat = coords.lat;
+        lng = coords.lng;
+        setStartCoords(coords);
+        setGpsStatus(`GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+      } catch {
+        setGpsStatus('GPS unavailable — recording without location');
+      }
     }
 
     const sessionId = crypto.randomUUID();
@@ -274,20 +281,27 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
   async function handleStopSession() {
     if (!activeSession) return;
     setLoading(true);
-    setGpsStatus('Acquiring stop GPS...');
+
+    // Check if this is an internal activity (skip GPS)
+    const isInternal = (activeSession.clients as any)?.service_type === 'INTERNAL';
 
     try {
       let lat: number | null = null;
       let lng: number | null = null;
 
-      try {
-        const coords = await getCurrentGps();
-        lat = coords.lat;
-        lng = coords.lng;
-        setStopCoords(coords);
-        setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
-      } catch {
-        setGpsStatus('Stop GPS unavailable');
+      if (isInternal) {
+        setGpsStatus('Internal activity — GPS skipped');
+      } else {
+        setGpsStatus('Acquiring stop GPS...');
+        try {
+          const coords = await getCurrentGps();
+          lat = coords.lat;
+          lng = coords.lng;
+          setStopCoords(coords);
+          setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+        } catch {
+          setGpsStatus('Stop GPS unavailable');
+        }
       }
 
       const now = new Date().toISOString();
@@ -339,19 +353,26 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
   async function handleClockOutSingleTech(entryId: number) {
     if (!activeSession) return;
     setLoading(true);
-    setGpsStatus('Acquiring stop GPS...');
+
+    // Check if this is an internal activity (skip GPS)
+    const isInternal = (activeSession.clients as any)?.service_type === 'INTERNAL';
 
     try {
       let lat: number | null = null;
       let lng: number | null = null;
 
-      try {
-        const coords = await getCurrentGps();
-        lat = coords.lat;
-        lng = coords.lng;
-        setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
-      } catch {
-        setGpsStatus('Stop GPS unavailable');
+      if (isInternal) {
+        setGpsStatus('Internal activity — GPS skipped');
+      } else {
+        setGpsStatus('Acquiring stop GPS...');
+        try {
+          const coords = await getCurrentGps();
+          lat = coords.lat;
+          lng = coords.lng;
+          setGpsStatus(`Stop GPS acquired ✓ (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`);
+        } catch {
+          setGpsStatus('Stop GPS unavailable');
+        }
       }
 
       const now = new Date().toISOString();
@@ -405,16 +426,19 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
 
     const now = new Date().toISOString();
 
-    // Get current GPS
-    let lat: number | null = activeSession.start_lat;
-    let lng: number | null = activeSession.start_lng;
+    // Get current GPS (skip for internal activities)
+    const isInternal = (activeSession.clients as any)?.service_type === 'INTERNAL';
+    let lat: number | null = isInternal ? null : activeSession.start_lat;
+    let lng: number | null = isInternal ? null : activeSession.start_lng;
 
-    try {
-      const coords = await getCurrentGps();
-      lat = coords.lat;
-      lng = coords.lng;
-    } catch {
-      // Use session start GPS as fallback
+    if (!isInternal) {
+      try {
+        const coords = await getCurrentGps();
+        lat = coords.lat;
+        lng = coords.lng;
+      } catch {
+        // Use session start GPS as fallback
+      }
     }
 
     const { error } = await supabase.from('time_entries').insert({
