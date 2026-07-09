@@ -36,14 +36,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
   if (isLeader) {
     navItems.push(
       { view: 'team-leader-portal', label: 'Team Portal', icon: <UserCheck size={18} /> },
-      { view: 'schedule', label: 'Schedule', icon: <CalendarDays size={18} /> },
+      { view: 'schedule', label: 'Schedule', icon: <CalendarDays size={18} className="text-orange-400" /> },
       { view: 'tech-portal', label: 'My Timesheet', icon: <Clock size={18} /> },
     );
   }
 
   if (isTech) {
     navItems.push(
-      { view: 'schedule', label: 'My Schedule', icon: <CalendarDays size={18} /> },
+      { view: 'schedule', label: 'My Schedule', icon: <CalendarDays size={18} className="text-orange-400" /> },
       { view: 'tech-portal', label: 'My Timesheet', icon: <Clock size={18} /> },
     );
   }
