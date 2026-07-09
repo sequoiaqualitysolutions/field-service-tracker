@@ -27,9 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
       { view: 'user-management', label: 'Technicians', icon: <Users size={18} /> },
       { view: 'schedule', label: 'Schedule', icon: <CalendarDays size={18} /> },
     );
-    if (profile.is_platform_admin) {
-      navItems.push({ view: 'route-planner', label: 'Route Planner', icon: <Route size={18} /> });
-    }
+    navItems.push({ view: 'route-planner', label: 'Route Planner', icon: <Route size={18} /> });
     navItems.push(
       { view: 'tech-portal', label: 'Tech Portal', icon: <Clock size={18} /> },
     );
