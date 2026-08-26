@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BarChart3, AlertTriangle, Users, Clock, TrendingUp, MapPin } from 'lucide-react';
 import { Profile, TimeEntry, WeekInfo } from '../types';
 import { supabase } from '../lib/supabase';
-import { formatDuration, getWeeksInMonth, calcHours } from '../utils/helpers';
+import { formatDuration, getWeeksInMonth, calcHours, OT_THRESHOLD } from '../utils/helpers';
 import { FlaggedGpsMap } from './FlaggedGpsMap';
 import Chart from 'chart.js/auto';
 
@@ -140,8 +140,8 @@ export const AdminDashboard: React.FC = () => {
   techs.forEach(t => {
     const weeklyHrs = getWeeklyHours(t.id);
     weeklyHrs.forEach((hrs, i) => {
-      if (hrs > 45) {
-        otAlerts.push({ techName: t.name, week: weeks[i].label, hours: hrs, otHours: hrs - 45 });
+      if (hrs > OT_THRESHOLD) {
+        otAlerts.push({ techName: t.name, week: weeks[i].label, hours: hrs, otHours: hrs - OT_THRESHOLD });
       }
     });
   });
@@ -195,12 +195,12 @@ export const AdminDashboard: React.FC = () => {
         borderWidth: 2,
         tension: 0.3,
         fill: false,
-        pointRadius: weeklyHrs.map(h => h > 45 ? 6 : 4),
-        pointBackgroundColor: weeklyHrs.map(h => h > 45 ? '#ef4444' : colors[i % colors.length]),
+        pointRadius: weeklyHrs.map(h => h > OT_THRESHOLD ? 6 : 4),
+        pointBackgroundColor: weeklyHrs.map(h => h > OT_THRESHOLD ? '#ef4444' : colors[i % colors.length]),
         segment: {
           borderColor: (ctx: any) => {
             const idx = ctx.p0DataIndex;
-            return weeklyHrs[idx] > 45 || weeklyHrs[idx + 1] > 45 ? '#ef4444' : undefined;
+            return weeklyHrs[idx] > OT_THRESHOLD || weeklyHrs[idx + 1] > OT_THRESHOLD ? '#ef4444' : undefined;
           },
         },
       };
@@ -221,7 +221,7 @@ export const AdminDashboard: React.FC = () => {
             callbacks: {
               afterLabel: (ctx: any) => {
                 const hrs = ctx.parsed.y;
-                return hrs > 45 ? `⚠️ OVERTIME: ${(hrs - 45).toFixed(1)}h over 45h` : '';
+                return hrs > OT_THRESHOLD ? `⚠️ OVERTIME: ${(hrs - OT_THRESHOLD).toFixed(1)}h over ${OT_THRESHOLD}h` : '';
               },
             },
           },
@@ -232,20 +232,20 @@ export const AdminDashboard: React.FC = () => {
             max: maxHrs,
             afterBuildTicks: (axis: any) => {
               const ticks = axis.ticks || [];
-              if (!ticks.find((t: any) => t.value === 45)) {
-                ticks.push({ value: 45 });
+              if (!ticks.find((t: any) => t.value === OT_THRESHOLD)) {
+                ticks.push({ value: OT_THRESHOLD });
                 ticks.sort((a: any, b: any) => a.value - b.value);
               }
               axis.ticks = ticks;
             },
             ticks: {
               color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= 45 ? '#ef4444' : '#e0d6cc',
-              callback: (v: number | string) => Number(v) === 45 ? '45h ⛔' : `${Math.round(Number(v))}h`,
-              font: (ctx: any) => ({ size: 10, family: 'Montserrat', weight: (ctx.tick?.value != null && ctx.tick.value === 45 ? 'bold' : 'normal') as any }),
+              callback: (v: number | string) => Number(v) === OT_THRESHOLD ? `${OT_THRESHOLD}h ⛔` : `${Math.round(Number(v))}h`,
+              font: (ctx: any) => ({ size: 10, family: 'Montserrat', weight: (ctx.tick?.value != null && ctx.tick.value === OT_THRESHOLD ? 'bold' : 'normal') as any }),
             },
             grid: {
-              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 45 ? '#ef4444' : '#1a1f26',
-              lineWidth: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === 45 ? 2 : 1,
+              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === OT_THRESHOLD ? '#ef4444' : '#1a1f26',
+              lineWidth: (ctx: any) => ctx.tick?.value != null && ctx.tick.value === OT_THRESHOLD ? 2 : 1,
             },
           },
           x: {
@@ -417,7 +417,7 @@ export const AdminDashboard: React.FC = () => {
           <div style={{ height: '320px' }}>
             <canvas ref={chartRef} />
           </div>
-          <p className="text-xs text-base-content/40 mt-2">Red dashed line = 45h/week threshold. Points turn red when over.</p>
+          <p className="text-xs text-base-content/40 mt-2">Red dashed line = 44h/week threshold. Points turn red when over.</p>
         </div>
       </div>
 
@@ -492,7 +492,7 @@ export const AdminDashboard: React.FC = () => {
         {techs.map((t, idx) => {
           const totalHrs = getTotalHours(t.id);
           const weeklyHrs = getWeeklyHours(t.id);
-          const hasOt = weeklyHrs.some(h => h > 45);
+          const hasOt = weeklyHrs.some(h => h > OT_THRESHOLD);
           return (
             <div key={t.id} className={`card ${hasOt ? 'bg-error/10 border-2 border-error/40' : 'bg-base-200 border border-primary/10'}`}>
               <div className="card-body p-4">
@@ -513,9 +513,9 @@ export const AdminDashboard: React.FC = () => {
                     {weeklyHrs.map((h, wi) => (
                       <span
                         key={wi}
-                        className={`badge badge-xs ${h > 45 ? 'badge-error' : h > 0 ? 'badge-primary' : 'badge-ghost'}`}
+                        className={`badge badge-xs ${h > OT_THRESHOLD ? 'badge-error' : h > 0 ? 'badge-primary' : 'badge-ghost'}`}
                       >
-                        W{wi + 1}: {h.toFixed(1)}h {h > 45 ? '🔥' : ''}
+                        W{wi + 1}: {h.toFixed(1)}h {h > OT_THRESHOLD ? '🔥' : ''}
                       </span>
                     ))}
                   </div>

@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, Download, Calendar, MapPin, Pencil, Trash2, X, Save } from 'lucide-react';
 import { Profile, TimeEntry } from '../types';
 import { supabase } from '../lib/supabase';
-import { formatDuration, calcHours, getWeeksInMonth } from '../utils/helpers';
-import * as XLSX from 'xlsx';
+import { formatDuration, calcHours, getWeeksInMonth, OT_THRESHOLD } from '../utils/helpers';
+import jsPDF from 'jspdf';
 
 const TZ = 'Africa/Johannesburg';
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { timeZone: TZ });
@@ -92,8 +92,8 @@ export const PayReport: React.FC = () => {
     let overtimeHours = 0;
     let sundayHours = 0;
     weeklyData.forEach(w => {
-      if (w.weekdayHours <= 45) { regularHours += w.weekdayHours; }
-      else { regularHours += 45; overtimeHours += w.weekdayHours - 45; }
+      if (w.weekdayHours <= OT_THRESHOLD) { regularHours += w.weekdayHours; }
+      else { regularHours += OT_THRESHOLD; overtimeHours += w.weekdayHours - OT_THRESHOLD; }
       sundayHours += w.sundayHours;
     });
 
@@ -168,100 +168,244 @@ export const PayReport: React.FC = () => {
     }
   }
 
-  // ===== Export =====
+  // ===== Export (branded PDF — mirrors the on-screen report) =====
   function exportReport() {
-    const wb = XLSX.utils.book_new();
-    const exportTechs = selectedTech === 'all' ? techs : techs.filter(t => t.id === selectedTech);
-    const exportEntries = selectedTech === 'all' ? entries : entries.filter(e => e.tech_id === selectedTech);
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const PW = 297, PH = 210, M = 10;
 
-    // TAB 1: Summary
-    const summaryRows: any[][] = [];
-    summaryRows.push(['PAY REPORT SUMMARY']);
-    summaryRows.push([`Month: ${monthNames[month]} ${year}`]);
-    if (selectedTech !== 'all') {
-      const techName = techs.find(t => t.id === selectedTech)?.name || '';
-      summaryRows.push([`Technician: ${techName}`]);
+    const BRAND: [number, number, number] = [5, 13, 17];
+    const ORANGE: [number, number, number] = [242, 124, 34];
+    const RED: [number, number, number] = [220, 38, 38];
+    const AMBER: [number, number, number] = [217, 119, 6];
+    const GREEN: [number, number, number] = [22, 163, 74];
+    const GREY: [number, number, number] = [115, 115, 115];
+    const LINE: [number, number, number] = [225, 225, 225];
+    const INK: [number, number, number] = [30, 30, 30];
+
+    // This report always covers every team member, regardless of the on-screen filter.
+    const exportTechs = techs;
+    const rows = exportTechs.map(t => ({ t, d: getTechData(t.id) }));
+
+    let gReg = 0, gOT = 0, gSun = 0, gPay = 0;
+    rows.forEach(({ t, d }) => {
+      const rate = Number(t.hourly_rate) || 0;
+      gReg += d.regularHours;
+      gOT += d.overtimeHours;
+      gSun += d.sundayHours;
+      gPay += d.regularHours * rate + d.overtimeHours * rate * 1.5 + d.sundayHours * rate * 2;
+    });
+
+    const generated = new Date().toLocaleString('en-ZA', { timeZone: TZ });
+
+    function footer() {
+      doc.setDrawColor(...LINE);
+      doc.setLineWidth(0.3);
+      doc.line(M, PH - 14, PW - M, PH - 14);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...BRAND);
+      doc.text('Powered by Sequoia Grove / \u00A9 2026 Sequoia Quality Solutions\u2122', M, PH - 9.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...GREY);
+      doc.text('Field Service Time Tracker\u2122', M, PH - 5.5);
+      doc.text(`Generated ${generated} (SAST)`, PW - M, PH - 9.5, { align: 'right' });
     }
-    summaryRows.push([]);
-    summaryRows.push(['Technician','Email','Hourly Rate (R)','Regular Hours','OT Hours (1.5x)','Sunday Hours (2x)','Total Hours','Regular Pay (R)','OT Pay (R)','Sunday Pay (R)','Total Pay (R)','GPS Missing','Distance > 1km','Short Visit','Total Flags']);
 
-    let tReg = 0, tOT = 0, tSun = 0, tTotalHrs = 0, tPay = 0;
-    exportTechs.forEach(t => {
-      const d = getTechData(t.id);
-      const rate = Number(t.hourly_rate);
+    function header() {
+      doc.setFillColor(...BRAND);
+      doc.rect(0, 0, PW, 17, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text('SPCS  |  Pay Report', M, 11);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...ORANGE);
+      doc.text(`${monthNames[month]} ${year}   \u2022   All Team Members`, PW - M, 11, { align: 'right' });
+      return 17;
+    }
+
+    function kpis(y: number) {
+      const gap = 4;
+      const w = (PW - 2 * M - 3 * gap) / 4;
+      const h = 19;
+      const cards: [string, string, [number, number, number]][] = [
+        ['Regular Hours', gReg.toFixed(1), GREEN],
+        ['Overtime Hours (1.5x)', gOT.toFixed(1), gOT > 0 ? RED : INK],
+        ['Sunday Hours (2x)', gSun.toFixed(1), gSun > 0 ? AMBER : INK],
+        ['Total Payroll', `R${gPay.toFixed(2)}`, INK],
+      ];
+      cards.forEach((c, i) => {
+        const x = M + i * (w + gap);
+        doc.setFillColor(245, 246, 247);
+        doc.setDrawColor(...LINE);
+        doc.roundedRect(x, y, w, h, 1.5, 1.5, 'FD');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...GREY);
+        doc.text(c[0], x + 3, y + 6);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(...c[2]);
+        doc.text(c[1], x + 3, y + 15);
+      });
+      return h;
+    }
+
+    // A tech block: name / email / rate, total pay, flag badges, weekly table
+    function techBlock(t: Profile, d: ReturnType<typeof getTechData>, y: number) {
+      const rate = Number(t.hourly_rate) || 0;
       const regPay = d.regularHours * rate;
       const otPay = d.overtimeHours * rate * 1.5;
       const sunPay = d.sundayHours * rate * 2;
       const totalPay = regPay + otPay + sunPay;
-      tReg += d.regularHours; tOT += d.overtimeHours; tSun += d.sundayHours;
-      tTotalHrs += d.totalHours; tPay += totalPay;
-      summaryRows.push([
-        t.name, t.email, Number(rate.toFixed(2)),
-        Number(d.regularHours.toFixed(2)), Number(d.overtimeHours.toFixed(2)), Number(d.sundayHours.toFixed(2)), Number(d.totalHours.toFixed(2)),
-        Number(regPay.toFixed(2)), Number(otPay.toFixed(2)), Number(sunPay.toFixed(2)), Number(totalPay.toFixed(2)),
-        d.gpsFlags, d.distanceFlags, d.shortVisitFlags, d.totalFlags
-      ]);
+      const flagged = d.overtimeHours > 0 || d.sundayHours > 0;
+
+      const cols = [55, 38, 38, 38, 42, 66];
+      const rowH = 5.6;
+      const bodyRows = d.weeklyData.length;
+      const blockH = 13 + rowH * (bodyRows + 2) + 4;
+
+      // card
+      doc.setFillColor(flagged ? 253 : 250, flagged ? 242 : 250, flagged ? 242 : 251);
+      doc.setDrawColor(flagged ? 240 : 225, flagged ? 200 : 225, flagged ? 200 : 225);
+      doc.roundedRect(M, y, PW - 2 * M, blockH, 1.5, 1.5, 'FD');
+
+      // name + email/rate
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...INK);
+      doc.text(t.name, M + 4, y + 6.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...GREY);
+      doc.text(`${t.email}  \u2022  R${rate.toFixed(2)}/hr`, M + 4, y + 11);
+
+      // total pay
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...INK);
+      doc.text(`R${totalPay.toFixed(2)}`, PW - M - 4, y + 6.5, { align: 'right' });
+
+      // badges (right aligned, same set as on screen)
+      const badges: [string, [number, number, number]][] = [];
+      if (d.overtimeHours > 0) badges.push([`OT 1.5x: +R${otPay.toFixed(2)}`, RED]);
+      if (d.sundayHours > 0) badges.push([`Sun 2x: +R${sunPay.toFixed(2)}`, AMBER]);
+      if (d.gpsFlags > 0) badges.push([`${d.gpsFlags} GPS missing`, AMBER]);
+      if (d.distanceFlags > 0) badges.push([`${d.distanceFlags} distance > 1km`, RED]);
+      if (d.shortVisitFlags > 0) badges.push([`${d.shortVisitFlags} short visit${d.shortVisitFlags > 1 ? 's' : ''}`, RED]);
+
+      let bx = PW - M - 4;
+      doc.setFontSize(6.5);
+      // drawn right-to-left so the on-screen left-to-right order is preserved
+      [...badges].reverse().forEach(([label, colour]) => {
+        const w = doc.getTextWidth(label) + 4;
+        if (bx - w < M + 90) return; // never overlap the name block
+        doc.setFillColor(...colour);
+        doc.roundedRect(bx - w, y + 8.2, w, 4.4, 1, 1, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text(label, bx - w + 2, y + 11.35);
+        bx -= w + 2;
+      });
+
+      // table
+      let ty = y + 14;
+      const headers = ['Week', 'Total', 'Regular', 'OT (1.5x)', 'Sunday (2x)', 'Status'];
+      doc.setFillColor(238, 239, 241);
+      doc.rect(M + 3, ty, PW - 2 * M - 6, rowH, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...GREY);
+      let cx = M + 5;
+      headers.forEach((h, i) => { doc.text(h, cx, ty + 3.9); cx += cols[i]; });
+      ty += rowH;
+
+      d.weeklyData.forEach((w, i) => {
+        const reg = Math.min(w.weekdayHours, OT_THRESHOLD);
+        const ot = Math.max(0, w.weekdayHours - OT_THRESHOLD);
+        const hasFlags = ot > 0 || w.sundayHours > 0;
+        const status = [
+          ot > 0 ? 'OT' : '',
+          w.sundayHours > 0 ? 'Sun' : '',
+          ot === 0 && w.sundayHours === 0 && w.totalHours > 0 ? 'OK' : '',
+          w.totalHours === 0 ? '\u2014' : '',
+        ].filter(Boolean).join('  ');
+
+        const cells = [
+          weeks[i].label,
+          `${w.totalHours.toFixed(1)}h`,
+          `${reg.toFixed(1)}h`,
+          ot > 0 ? `+${ot.toFixed(1)}h` : '\u2014',
+          w.sundayHours > 0 ? `${w.sundayHours.toFixed(1)}h` : '\u2014',
+          status,
+        ];
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        cx = M + 5;
+        cells.forEach((c, ci) => {
+          if (hasFlags) doc.setTextColor(...RED);
+          else doc.setTextColor(...INK);
+          if (ci === 4 && w.sundayHours > 0) doc.setTextColor(...AMBER);
+          doc.setFont('helvetica', ci === 1 ? 'bold' : 'normal');
+          doc.text(c, cx, ty + 3.9);
+          cx += cols[ci];
+        });
+        doc.setDrawColor(...LINE);
+        doc.setLineWidth(0.15);
+        doc.line(M + 3, ty + rowH, PW - M - 3, ty + rowH);
+        ty += rowH;
+      });
+
+      // TOTAL row
+      doc.setFillColor(...BRAND);
+      doc.rect(M + 3, ty, PW - 2 * M - 6, rowH, 'F');
+      const totals = [
+        'TOTAL',
+        `${d.totalHours.toFixed(1)}h`,
+        `${d.regularHours.toFixed(1)}h`,
+        d.overtimeHours > 0 ? `+${d.overtimeHours.toFixed(1)}h` : '\u2014',
+        d.sundayHours > 0 ? `${d.sundayHours.toFixed(1)}h` : '\u2014',
+        `R${totalPay.toFixed(2)}`,
+      ];
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      cx = M + 5;
+      totals.forEach((c, ci) => {
+        if (ci === 3 && d.overtimeHours > 0) doc.setTextColor(255, 150, 150);
+        else if (ci === 4 && d.sundayHours > 0) doc.setTextColor(255, 205, 120);
+        else doc.setTextColor(255, 255, 255);
+        doc.text(c, cx, ty + 3.9);
+        cx += cols[ci];
+      });
+
+      return blockH;
+    }
+
+    // Two technicians per page, headed and footed on every page
+    if (rows.length === 0) {
+      header();
+      footer();
+    }
+    rows.forEach(({ t, d }, i) => {
+      const onNewPage = i % 2 === 0;
+      if (onNewPage) {
+        if (i > 0) doc.addPage();
+        const hy = header();
+        if (i === 0) {
+          const kh = kpis(hy + 5);
+          (doc as any).__cursor = hy + 5 + kh + 5;
+        } else {
+          (doc as any).__cursor = hy + 6;
+        }
+        footer();
+      }
+      const y = (doc as any).__cursor as number;
+      const used = techBlock(t, d, y);
+      (doc as any).__cursor = y + used + 5;
     });
-    summaryRows.push([]);
-    summaryRows.push(['TOTALS','','',Number(tReg.toFixed(2)),Number(tOT.toFixed(2)),Number(tSun.toFixed(2)),Number(tTotalHrs.toFixed(2)),'','','',Number(tPay.toFixed(2)),'','','','']);
 
-    const ws1 = XLSX.utils.aoa_to_sheet(summaryRows);
-    ws1['!cols'] = [
-      { wch: 20 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 },
-      { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 16 },
-      { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
-    ];
-    XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
-
-    // TAB 2: Detailed Entries
-    const detailRows: any[][] = [];
-    detailRows.push(['DETAILED TIME ENTRIES']);
-    detailRows.push([`Month: ${monthNames[month]} ${year}`]);
-    detailRows.push([]);
-    detailRows.push(['Technician','Client','Activity','Account #','Date','Day','Clock In','Clock Out','Hours','Sunday','Notes','GPS Missing','Distance > 1km','Short Visit']);
-
-    exportEntries.forEach(e => {
-      const techName = (e.profiles as any)?.name || 'Unknown';
-      const isInternal = (e.clients as any)?.service_type === 'INTERNAL';
-      const clientName = isInternal ? '' : ((e.clients as any)?.name || 'Unknown');
-      const activityName = isInternal ? ((e.clients as any)?.name || '').replace(/[\u{1F4CB}\u{1F527}\u{1F697}\u{1F4DA}\u{1F37D}]\s*/gu, '') : '';
-      const acctNum = isInternal ? '' : ((e.clients as any)?.account_number || '');
-      const date = fmtDate(e.start_time);
-      const dayName = fmtDay(e.start_time);
-      const clockIn = fmtTime(e.start_time);
-      const clockOut = e.end_time ? fmtTime(e.end_time) : '';
-      const hrs = Number(calcHours(e.start_time, e.end_time).toFixed(2));
-      const isSun = isSunday(e.start_time) ? 'YES' : '';
-      const notes = (e.notes || '').replace(/\n/g, ' ');
-      const gpsMissing = isInternal ? '' : ((e.start_lat == null || e.stop_lat == null) ? 'YES' : '');
-      const distFlag = isInternal ? '' : ((e.distance_km != null && e.distance_km > 1) ? `YES (${e.distance_km.toFixed(2)}km)` : '');
-      const durMin = e.end_time ? (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000 : 999;
-      const shortFlag = isInternal ? '' : (durMin < 10 ? `YES (${Math.round(durMin)}min)` : '');
-
-      detailRows.push([
-        techName, clientName, activityName, acctNum,
-        date, dayName, clockIn, clockOut, hrs, isSun, notes,
-        gpsMissing, distFlag, shortFlag
-      ]);
-    });
-
-    const ws2 = XLSX.utils.aoa_to_sheet(detailRows);
-    ws2['!cols'] = [
-      { wch: 18 }, { wch: 24 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 8 },
-      { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 30 },
-      { wch: 14 }, { wch: 18 }, { wch: 16 },
-    ];
-    XLSX.utils.book_append_sheet(wb, ws2, 'Detailed Entries');
-
-    const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const techSuffix = selectedTech !== 'all' ? '-' + (techs.find(t => t.id === selectedTech)?.name || 'tech') : '';
-    a.download = `pay-report-${monthNames[month]}-${year}${techSuffix}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    doc.save(`SPCS-Pay-Report-${monthNames[month]}-${year}.pdf`);
   }
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -298,7 +442,7 @@ export const PayReport: React.FC = () => {
             {techs.map(t => <option key={t.id} value={t.id}>{t.name} ({t.role === 'team_leader' ? 'TL' : 'Tech'})</option>)}
           </select>
           <button className="btn btn-primary btn-sm" onClick={exportReport}>
-            <Download size={14} /> Export Report
+            <Download size={14} /> Export PDF
           </button>
         </div>
       </div>
@@ -378,8 +522,8 @@ export const PayReport: React.FC = () => {
                   </thead>
                   <tbody>
                     {d.weeklyData.map((w, i) => {
-                      const reg = Math.min(w.weekdayHours, 45);
-                      const ot = Math.max(0, w.weekdayHours - 45);
+                      const reg = Math.min(w.weekdayHours, OT_THRESHOLD);
+                      const ot = Math.max(0, w.weekdayHours - OT_THRESHOLD);
                       const hasFlags = ot > 0 || w.sundayHours > 0;
                       return (
                         <tr key={i} className={hasFlags ? 'text-error' : ''}>

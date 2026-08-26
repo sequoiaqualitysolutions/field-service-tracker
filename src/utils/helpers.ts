@@ -115,3 +115,7 @@ export function getWeeksInMonth(year: number, month: number) {
   }
   return weeks;
 }
+
+// Weekly overtime threshold (SPCS is a 44-hour-per-week company).
+// Sunday hours are paid at 2x and are excluded from the overtime calculation.
+export const OT_THRESHOLD = 44;
