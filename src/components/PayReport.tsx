@@ -85,7 +85,13 @@ export const PayReport: React.FC = () => {
       const sundayHours = weekEntries
         .filter(e => isSunday(e.start_time))
         .reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0);
-      return { weekdayHours, sundayHours, totalHours: weekdayHours + sundayHours };
+      // Mon-Fri only. The 40-hour short-week test excludes Saturday and Sunday,
+      // both of which are treated as overtime. Note weekdayHours above means
+      // "everything except Sunday" and therefore still includes Saturday.
+      const mondayToFridayHours = weekEntries
+        .filter(e => { const dow = new Date(e.start_time).getDay(); return dow >= 1 && dow <= 5; })
+        .reduce((sum, e) => sum + calcHours(e.start_time, e.end_time), 0);
+      return { weekdayHours, sundayHours, mondayToFridayHours, totalHours: weekdayHours + sundayHours };
     });
 
     let regularHours = 0;
@@ -183,7 +189,7 @@ export const PayReport: React.FC = () => {
     const LINE: [number, number, number] = [225, 225, 225];
     const INK: [number, number, number] = [30, 30, 30];
 
-    const SHORT_WEEK = 40; // weeks under this many hours are flagged
+    const SHORT_WEEK = 40; // Mon-Fri hours under this are flagged; Sat/Sun are overtime and excluded
 
     // This report always covers every team member, regardless of the on-screen filter.
     const exportTechs = techs;
@@ -342,8 +348,8 @@ export const PayReport: React.FC = () => {
         ].filter(Boolean).join('  ');
 
         const partial = isPartialWeek(i);
-        const isShort = w.totalHours > 0 && w.totalHours < SHORT_WEEK;
-        const shortText = w.totalHours === 0 ? '\u2014' : (isShort ? 'Yes' : 'No');
+        const isShort = w.mondayToFridayHours > 0 && w.mondayToFridayHours < SHORT_WEEK;
+        const shortText = w.mondayToFridayHours === 0 ? '\u2014' : (isShort ? 'Yes' : 'No');
         // Highlighted only for genuine short weeks — a week clipped by the month is not news.
         const highlightShort = isShort && !partial;
 
@@ -381,7 +387,7 @@ export const PayReport: React.FC = () => {
       doc.setFillColor(...BRAND);
       doc.rect(M + 3, ty, PW - 2 * M - 6, rowH, 'F');
       const shortWeekCount = d.weeklyData.filter((w, i) =>
-        w.totalHours > 0 && w.totalHours < SHORT_WEEK && !isPartialWeek(i)
+        w.mondayToFridayHours > 0 && w.mondayToFridayHours < SHORT_WEEK && !isPartialWeek(i)
       ).length;
       const totals = [
         'TOTAL',
