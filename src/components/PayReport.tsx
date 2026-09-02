@@ -168,7 +168,7 @@ export const PayReport: React.FC = () => {
     }
   }
 
-  // ===== Export (branded PDF — mirrors the on-screen report) =====
+  // ===== Export (branded PDF — one technician per page: summary then detail) =====
   function exportReport() {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const PW = 297, PH = 210, M = 10;
@@ -178,9 +178,12 @@ export const PayReport: React.FC = () => {
     const RED: [number, number, number] = [220, 38, 38];
     const AMBER: [number, number, number] = [217, 119, 6];
     const GREEN: [number, number, number] = [22, 163, 74];
+    const BLUE: [number, number, number] = [37, 99, 235];
     const GREY: [number, number, number] = [115, 115, 115];
     const LINE: [number, number, number] = [225, 225, 225];
     const INK: [number, number, number] = [30, 30, 30];
+
+    const SHORT_WEEK = 40; // weeks under this many hours are flagged
 
     // This report always covers every team member, regardless of the on-screen filter.
     const exportTechs = techs;
@@ -196,6 +199,12 @@ export const PayReport: React.FC = () => {
     });
 
     const generated = new Date().toLocaleString('en-ZA', { timeZone: TZ });
+
+    // A week clipped by the start or end of the month is always short, so it is
+    // reported but never highlighted.
+    function isPartialWeek(i: number) {
+      return (weeks[i].endDay - weeks[i].startDay + 1) < 7;
+    }
 
     function footer() {
       doc.setDrawColor(...LINE);
@@ -261,7 +270,7 @@ export const PayReport: React.FC = () => {
       const totalPay = regPay + otPay + sunPay;
       const flagged = d.overtimeHours > 0 || d.sundayHours > 0;
 
-      const cols = [55, 38, 38, 38, 42, 66];
+      const cols = [50, 34, 34, 34, 40, 45, 40];
       const rowH = 5.6;
       const bodyRows = d.weeklyData.length;
       const blockH = 13 + rowH * (bodyRows + 2) + 4;
@@ -311,7 +320,7 @@ export const PayReport: React.FC = () => {
 
       // table
       let ty = y + 14;
-      const headers = ['Week', 'Total', 'Regular', 'OT (1.5x)', 'Sunday (2x)', 'Status'];
+      const headers = ['Week', 'Total', 'Regular', 'OT (1.5x)', 'Sunday (2x)', 'Status', '<40 hours'];
       doc.setFillColor(238, 239, 241);
       doc.rect(M + 3, ty, PW - 2 * M - 6, rowH, 'F');
       doc.setFont('helvetica', 'bold');
@@ -332,6 +341,12 @@ export const PayReport: React.FC = () => {
           w.totalHours === 0 ? '\u2014' : '',
         ].filter(Boolean).join('  ');
 
+        const partial = isPartialWeek(i);
+        const isShort = w.totalHours > 0 && w.totalHours < SHORT_WEEK;
+        const shortText = w.totalHours === 0 ? '\u2014' : (isShort ? 'Yes' : 'No');
+        // Highlighted only for genuine short weeks — a week clipped by the month is not news.
+        const highlightShort = isShort && !partial;
+
         const cells = [
           weeks[i].label,
           `${w.totalHours.toFixed(1)}h`,
@@ -339,15 +354,20 @@ export const PayReport: React.FC = () => {
           ot > 0 ? `+${ot.toFixed(1)}h` : '\u2014',
           w.sundayHours > 0 ? `${w.sundayHours.toFixed(1)}h` : '\u2014',
           status,
+          shortText,
         ];
-        doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.5);
         cx = M + 5;
         cells.forEach((c, ci) => {
           if (hasFlags) doc.setTextColor(...RED);
           else doc.setTextColor(...INK);
           if (ci === 4 && w.sundayHours > 0) doc.setTextColor(...AMBER);
-          doc.setFont('helvetica', ci === 1 ? 'bold' : 'normal');
+          let weight = ci === 1 ? 'bold' : 'normal';
+          if (ci === 6) {
+            if (highlightShort) { doc.setTextColor(...BLUE); weight = 'bold'; }
+            else { doc.setTextColor(...(isShort ? GREY : INK)); weight = 'normal'; }
+          }
+          doc.setFont('helvetica', weight);
           doc.text(c, cx, ty + 3.9);
           cx += cols[ci];
         });
@@ -360,6 +380,9 @@ export const PayReport: React.FC = () => {
       // TOTAL row
       doc.setFillColor(...BRAND);
       doc.rect(M + 3, ty, PW - 2 * M - 6, rowH, 'F');
+      const shortWeekCount = d.weeklyData.filter((w, i) =>
+        w.totalHours > 0 && w.totalHours < SHORT_WEEK && !isPartialWeek(i)
+      ).length;
       const totals = [
         'TOTAL',
         `${d.totalHours.toFixed(1)}h`,
@@ -367,6 +390,7 @@ export const PayReport: React.FC = () => {
         d.overtimeHours > 0 ? `+${d.overtimeHours.toFixed(1)}h` : '\u2014',
         d.sundayHours > 0 ? `${d.sundayHours.toFixed(1)}h` : '\u2014',
         `R${totalPay.toFixed(2)}`,
+        shortWeekCount > 0 ? `${shortWeekCount} short` : '\u2014',
       ];
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
@@ -374,6 +398,7 @@ export const PayReport: React.FC = () => {
       totals.forEach((c, ci) => {
         if (ci === 3 && d.overtimeHours > 0) doc.setTextColor(255, 150, 150);
         else if (ci === 4 && d.sundayHours > 0) doc.setTextColor(255, 205, 120);
+        else if (ci === 6 && shortWeekCount > 0) doc.setTextColor(150, 200, 255);
         else doc.setTextColor(255, 255, 255);
         doc.text(c, cx, ty + 3.9);
         cx += cols[ci];
@@ -382,27 +407,146 @@ export const PayReport: React.FC = () => {
       return blockH;
     }
 
-    // Two technicians per page, headed and footed on every page
+    // ===== Detail: every time entry for the month, mirroring the on-screen table =====
+    const D_COLS = [22, 12, 52, 30, 14, 14, 14, 75, 44];
+    const D_HEADERS = ['Date', 'Day', 'Client', 'Activity', 'In', 'Out', 'Hours', 'Notes', 'Flags'];
+    const D_ROWH = 4.6;
+    const BOTTOM = PH - 18;
+
+    function detailHeaderRow(y: number) {
+      doc.setFillColor(238, 239, 241);
+      doc.rect(M, y, PW - 2 * M, D_ROWH, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...GREY);
+      let cx = M + 2;
+      D_HEADERS.forEach((h, i) => { doc.text(h, cx, y + 3.2); cx += D_COLS[i]; });
+      return y + D_ROWH;
+    }
+
+    function continuedBanner(t: Profile, y: number) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(...INK);
+      doc.text(`${t.name}`, M, y + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...GREY);
+      doc.text('time entry detail (continued)', M + doc.getTextWidth(`${t.name}`) + 26, y + 4);
+      return y + 7;
+    }
+
+    function fit(text: string, width: number) {
+      let s = text;
+      if (doc.getTextWidth(s) <= width) return s;
+      while (s.length > 1 && doc.getTextWidth(s + '\u2026') > width) s = s.slice(0, -1);
+      return s + '\u2026';
+    }
+
+    function detailTable(t: Profile, d: ReturnType<typeof getTechData>, startY: number) {
+      if (d.techEntries.length === 0) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8);
+        doc.setTextColor(...GREY);
+        doc.text('No time entries for this month.', M, startY + 4);
+        return;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...INK);
+      doc.text(`Time entry detail \u2014 ${d.techEntries.length} entr${d.techEntries.length === 1 ? 'y' : 'ies'}`, M, startY + 3);
+      let y = detailHeaderRow(startY + 5.5);
+
+      d.techEntries.forEach(entry => {
+        if (y + D_ROWH > BOTTOM) {
+          doc.addPage();
+          const hy = header();
+          footer();
+          y = detailHeaderRow(continuedBanner(t, hy + 5) + 1.5);
+        }
+
+        const hrs = calcHours(entry.start_time, entry.end_time);
+        const durMin = entry.end_time
+          ? (new Date(entry.end_time).getTime() - new Date(entry.start_time).getTime()) / 60000
+          : 999;
+        const isEntryInternal = (entry.clients as any)?.service_type === 'INTERNAL';
+        const isSun = isSunday(entry.start_time);
+
+        const flags: [string, [number, number, number]][] = [];
+        if (!isEntryInternal && (entry.start_lat == null || entry.stop_lat == null)) flags.push(['No GPS', AMBER]);
+        if (!isEntryInternal && entry.distance_km != null && entry.distance_km > 1) flags.push([`${entry.distance_km.toFixed(1)}km`, RED]);
+        if (durMin < 10) flags.push([`${Math.round(durMin)}min`, RED]);
+        if (isSun) flags.push(['Sun 2x', AMBER]);
+
+        if (isSun) {
+          doc.setFillColor(255, 248, 235);
+          doc.rect(M, y, PW - 2 * M, D_ROWH, 'F');
+        }
+
+        const activity = isEntryInternal
+          ? ((entry.clients as any)?.name || '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*/gu, '')
+          : '\u2014';
+        const cells = [
+          fmtDate(entry.start_time),
+          fmtDay(entry.start_time),
+          isEntryInternal ? '\u2014' : ((entry.clients as any)?.name || '\u2014'),
+          activity,
+          fmtTime(entry.start_time),
+          entry.end_time ? fmtTime(entry.end_time) : '\u2014',
+          `${hrs.toFixed(1)}h`,
+          entry.notes || 'No notes',
+        ];
+
+        doc.setFontSize(6.5);
+        let cx = M + 2;
+        cells.forEach((c, ci) => {
+          doc.setFont('helvetica', ci === 1 && isSun ? 'bold' : 'normal');
+          if (ci === 1 && isSun) doc.setTextColor(...AMBER);
+          else if (ci === 3 && isEntryInternal) doc.setTextColor(...AMBER);
+          else if (ci === 7 && !entry.notes) doc.setTextColor(180, 180, 180);
+          else doc.setTextColor(...INK);
+          doc.text(fit(String(c), D_COLS[ci] - 3), cx, y + 3.2);
+          cx += D_COLS[ci];
+        });
+
+        // flags cell
+        if (flags.length === 0) {
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(...GREEN);
+          doc.text('OK', cx, y + 3.2);
+        } else {
+          let fx = cx;
+          doc.setFont('helvetica', 'bold');
+          flags.forEach(([label, colour]) => {
+            const w = doc.getTextWidth(label);
+            if (fx + w > PW - M - 1) return;
+            doc.setTextColor(...colour);
+            doc.text(label, fx, y + 3.2);
+            fx += w + 3;
+          });
+        }
+
+        doc.setDrawColor(240, 240, 240);
+        doc.setLineWidth(0.1);
+        doc.line(M, y + D_ROWH, PW - M, y + D_ROWH);
+        y += D_ROWH;
+      });
+    }
+
+    // One technician per page: summary block, then their detail. Next tech starts a fresh page.
     if (rows.length === 0) {
       header();
       footer();
     }
     rows.forEach(({ t, d }, i) => {
-      const onNewPage = i % 2 === 0;
-      if (onNewPage) {
-        if (i > 0) doc.addPage();
-        const hy = header();
-        if (i === 0) {
-          const kh = kpis(hy + 5);
-          (doc as any).__cursor = hy + 5 + kh + 5;
-        } else {
-          (doc as any).__cursor = hy + 6;
-        }
-        footer();
-      }
-      const y = (doc as any).__cursor as number;
-      const used = techBlock(t, d, y);
-      (doc as any).__cursor = y + used + 5;
+      if (i > 0) doc.addPage();
+      const hy = header();
+      footer();
+      let y = hy + 5;
+      if (i === 0) y += kpis(y) + 5; // KPI cards head the report once
+      y += techBlock(t, d, y) + 5;
+      detailTable(t, d, y);
     });
 
     doc.save(`SPCS-Pay-Report-${monthNames[month]}-${year}.pdf`);
