@@ -239,7 +239,7 @@ export const AdminDashboard: React.FC = () => {
               axis.ticks = ticks;
             },
             ticks: {
-              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= 45 ? '#ef4444' : '#e0d6cc',
+              color: (ctx: any) => ctx.tick?.value != null && ctx.tick.value >= OT_THRESHOLD ? '#ef4444' : '#e0d6cc',
               callback: (v: number | string) => Number(v) === OT_THRESHOLD ? `${OT_THRESHOLD}h ⛔` : `${Math.round(Number(v))}h`,
               font: (ctx: any) => ({ size: 10, family: 'Montserrat', weight: (ctx.tick?.value != null && ctx.tick.value === OT_THRESHOLD ? 'bold' : 'normal') as any }),
             },
