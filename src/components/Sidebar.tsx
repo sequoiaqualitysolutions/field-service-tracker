@@ -29,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, currentView, onNaviga
     );
     navItems.push({ view: 'route-planner', label: 'Route Planner', icon: <Route size={18} /> });
     navItems.push(
+      { view: 'team-leader-portal', label: 'Team Portal', icon: <UserCheck size={18} /> },
       { view: 'tech-portal', label: 'Tech Portal', icon: <Clock size={18} /> },
     );
   }

@@ -10,6 +10,8 @@ interface TeamLeaderPortalProps {
 }
 
 export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onGpsUpdate }) => {
+  const isAdmin = profile.role === 'admin';
+  const [clockSelfIn, setClockSelfIn] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [allTechs, setAllTechs] = useState<Profile[]>([]);
   const [selectedClient, setSelectedClient] = useState<number>(0);
@@ -76,14 +78,20 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
   }, [activeSession]);
 
   async function loadData() {
-    // Get assigned clients for this team leader
-    const { data: assignments } = await supabase
-      .from('client_assignments')
-      .select('client_id, clients(*)')
-      .eq('tech_id', profile.id);
+    // Admins can dispatch any client; team leaders see only their assigned clients
+    let sourceClients: any[] = [];
+    if (isAdmin) {
+      const { data: allClients } = await supabase.from('clients').select('*');
+      sourceClients = allClients || [];
+    } else {
+      const { data: assignments } = await supabase
+        .from('client_assignments')
+        .select('client_id, clients(*)')
+        .eq('tech_id', profile.id);
+      sourceClients = (assignments || []).map((a: any) => a.clients);
+    }
 
-    const assignedClients = (assignments || [])
-      .map((a: any) => a.clients)
+    const assignedClients = sourceClients
       .filter(Boolean)
       .sort((a: Client, b: Client) => {
         const aInternal = a.service_type === 'INTERNAL' ? 0 : 1;
@@ -241,8 +249,16 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     }
     const availableSelected = allCandidates.filter(id => !actuallyBusy.has(id));
 
-    // Create time entries for leader + all available selected techs
-    const allPeople = [profile.id, ...availableSelected];
+    // Create time entries for leader + all available selected techs.
+    // An admin dispatching a crew is not necessarily on site, so his own entry is optional.
+    const includeSelf = !isAdmin || clockSelfIn;
+    const allPeople = includeSelf ? [profile.id, ...availableSelected] : availableSelected;
+    if (allPeople.length === 0) {
+      await supabase.from('team_sessions').delete().eq('id', sessionId);
+      setGpsStatus('Select at least one technician, or tick "Clock myself in too".');
+      setLoading(false);
+      return;
+    }
     const entries = allPeople.map(personId => ({
       tech_id: personId,
       client_id: selectedClient,
@@ -476,7 +492,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
     <div className="p-4 space-y-4 max-w-5xl mx-auto">
       <h2 className="text-lg font-bold flex items-center gap-2">
         <Users size={22} className="text-primary" />
-        {profile.name}&apos;s Team Portal
+        {profile.name}&apos;s Team Portal{isAdmin ? ' (Admin)' : ''}
       </h2>
 
       {/* Clock In / Active Session Card */}
@@ -490,7 +506,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
                 value={selectedClient}
                 onChange={e => setSelectedClient(Number(e.target.value))}
               >
-                <option value={0}>Select an assigned client...</option>
+                <option value={0}>{isAdmin ? 'Select a client...' : 'Select an assigned client...'}</option>
                 {clients.filter(c => c.service_type === 'INTERNAL').length > 0 && (
                   <optgroup label="⏱️ Time Activities">
                     {clients.filter(c => c.service_type === 'INTERNAL').map(c => (
@@ -507,7 +523,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
                 )}
               </select>
               {clients.length === 0 && (
-                <p className="text-xs text-warning">No clients assigned to you yet. Contact your admin.</p>
+                <p className="text-xs text-warning">{isAdmin ? 'No client records found.' : 'No clients assigned to you yet. Contact your admin.'}</p>
               )}
 
               {/* Multi-select Tech Dropdown */}
@@ -565,7 +581,7 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
                                 <p className="text-xs text-base-content/50">
                                   {isBusy
                                     ? `🔴 On clock at ${busyTechs[tech.id]}`
-                                    : `${tech.role === 'team_leader' ? '👑 Team Leader' : '🔧 Technician'} • $${Number(tech.hourly_rate).toFixed(2)}/hr`}
+                                    : `${tech.role === 'team_leader' ? '👑 Team Leader' : '🔧 Technician'} • R${Number(tech.hourly_rate).toFixed(2)}/hr`}
                                 </p>
                               </div>
                             </label>
@@ -597,6 +613,19 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
                 </div>
               )}
 
+              {/* Admin: clock self in too? */}
+              {isAdmin && (
+                <label className="flex items-center gap-3 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm checkbox-primary"
+                    checked={clockSelfIn}
+                    onChange={e => setClockSelfIn(e.target.checked)}
+                  />
+                  <span>Clock myself in too</span>
+                </label>
+              )}
+
               {/* Notes */}
               <textarea
                 className="textarea textarea-bordered w-full"
@@ -610,13 +639,15 @@ export const TeamLeaderPortal: React.FC<TeamLeaderPortalProps> = ({ profile, onG
               <button
                 className="btn btn-success w-full text-lg"
                 onClick={handleStartSession}
-                disabled={!selectedClient || loading}
+                disabled={!selectedClient || loading || (isAdmin && !clockSelfIn && selectedTechs.length === 0)}
               >
                 <Play size={20} />
-                Clock In Team ({selectedTechs.length + 1} {selectedTechs.length === 0 ? 'person' : 'people'})
+                Clock In Team ({selectedTechs.length + (!isAdmin || clockSelfIn ? 1 : 0)} {selectedTechs.length + (!isAdmin || clockSelfIn ? 1 : 0) === 1 ? 'person' : 'people'})
               </button>
               <p className="text-xs text-base-content/40 text-center">
-                This will clock in you + {selectedTechs.length} team member{selectedTechs.length !== 1 ? 's' : ''}
+                {!isAdmin || clockSelfIn
+                  ? <>This will clock in you + {selectedTechs.length} team member{selectedTechs.length !== 1 ? 's' : ''}</>
+                  : <>This will clock in {selectedTechs.length} team member{selectedTechs.length !== 1 ? 's' : ''} — not you</>}
               </p>
             </>
           ) : (
